@@ -448,6 +448,24 @@ pub(crate) fn paste_and_finish(app: &AppHandle, text: String, cancel_generation:
                 return;
             }
         }
+        let target = ah.state::<VoiceSessionState>().target_app();
+        let current = crate::focus_target::frontmost_app();
+        match crate::focus_target::decide_insert(target.as_ref(), current.as_ref(), &text) {
+            crate::focus_target::InsertDecision::CopyOnly(reason) => {
+                use tauri_plugin_clipboard_manager::ClipboardExt;
+                debug!("Not pasting ({reason:?}); leaving the text on the clipboard");
+                if let Err(e) = ah.clipboard().write_text(text) {
+                    error!("Failed to copy text to clipboard: {}", e);
+                    let _ = ah.emit("paste-error", ());
+                    utils::hide_recording_overlay(&ah);
+                } else {
+                    utils::show_copied_notice(&ah, reason);
+                }
+                set_tray_state(&ah, TrayIconState::Idle);
+                return;
+            }
+            crate::focus_target::InsertDecision::Paste => {}
+        }
         match utils::paste(text, ah.clone()) {
             Ok(()) => debug!("Text pasted successfully in {:?}", paste_time.elapsed()),
             Err(e) => {
@@ -533,6 +551,8 @@ impl ShortcutAction for TranscribeAction {
             );
             utils::set_overlay_session_mode(app, event.mode);
             let _ = event.emit(app);
+            app.state::<VoiceSessionState>()
+                .set_target_app(crate::focus_target::frontmost_app());
         }
 
         let tray_started = Instant::now();

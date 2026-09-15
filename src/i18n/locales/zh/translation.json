@@ -711,7 +711,9 @@
       "no_text_model": "请先在设置中配置文本模型。",
       "request_failed": "无法连接文本模型。",
       "invalid_output": "文本模型返回的内容无法使用。"
-    }
+    },
+    "copiedTargetChanged": "目标窗口已切换，文字已复制到剪贴板",
+    "copiedTerminal": "多行文字未直接粘贴到终端，已复制到剪贴板"
   },
   "whatsNew": {
     "title": "Handy v{{version}} 新功能"

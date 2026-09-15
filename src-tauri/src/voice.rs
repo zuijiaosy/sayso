@@ -438,6 +438,8 @@ pub struct TranslationFailedEvent {
 
 #[derive(Debug, Default)]
 struct Inner {
+    /// App that was frontmost when recording started.
+    target_app: Option<crate::focus_target::FrontApp>,
     mode: SessionMode,
     target_language: String,
     failed: Option<FailedTranslation>,
@@ -469,6 +471,7 @@ impl VoiceSessionState {
     /// Start a new session; clears any failure left from the previous one.
     pub fn begin(&self, mode: SessionMode, target_language: String) -> SessionModeEvent {
         let mut inner = self.lock();
+        inner.target_app = None;
         inner.mode = mode;
         inner.target_language = target_language;
         inner.failed = None;
@@ -501,6 +504,14 @@ impl VoiceSessionState {
     pub fn snapshot(&self) -> (SessionMode, String) {
         let inner = self.lock();
         (inner.mode, inner.target_language.clone())
+    }
+
+    pub fn set_target_app(&self, app: Option<crate::focus_target::FrontApp>) {
+        self.lock().target_app = app;
+    }
+
+    pub fn target_app(&self) -> Option<crate::focus_target::FrontApp> {
+        self.lock().target_app.clone()
     }
 
     pub fn set_failed(&self, failure: FailedTranslation) -> u64 {

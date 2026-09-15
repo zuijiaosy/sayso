@@ -21,7 +21,9 @@ type OverlayState =
   | "streaming"
   | "transcribing"
   | "processing"
-  | "translate_failed";
+  | "translate_failed"
+  | "copied_target_changed"
+  | "copied_terminal";
 
 const WAVE_BARS = 11;
 
@@ -192,6 +194,21 @@ const RecordingOverlay: React.FC = () => {
       : mode === "translate"
         ? t("overlay.translating")
         : t("overlay.processing");
+
+  if (state === "copied_target_changed" || state === "copied_terminal") {
+    return (
+      <div className="vl-stage">
+        <div className="vl-capsule vl-notice" role="status">
+          <CheckIcon />
+          <span className="vl-work-label">
+            {state === "copied_terminal"
+              ? t("overlay.copiedTerminal")
+              : t("overlay.copiedTargetChanged")}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   if (state === "translate_failed" && failure) {
     const reasonKey = `overlay.reason.${failure.reason}`;

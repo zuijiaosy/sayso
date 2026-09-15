@@ -72,6 +72,9 @@ fn overlay_dimensions(state: &str) -> (f64, f64) {
     if state == "translate_failed" {
         return (OVERLAY_FAILURE_WIDTH, OVERLAY_FAILURE_HEIGHT);
     }
+    if state.starts_with("copied_") {
+        return (OVERLAY_NOTICE_WIDTH, OVERLAY_HEIGHT);
+    }
     if OVERLAY_TRANSLATE_MODE.load(Ordering::Relaxed) {
         let height = if OVERLAY_PICKER_OPEN.load(Ordering::Relaxed) {
             OVERLAY_PICKER_HEIGHT
@@ -132,6 +135,30 @@ fn resize_visible_overlay(app_handle: &AppHandle) {
         #[cfg(target_os = "windows")]
         if let Err(error) = place_windows_overlay(&handle, &window, width, height) {
             log::error!("Failed to resize recording overlay: {error}");
+        }
+    });
+}
+
+const OVERLAY_NOTICE_WIDTH: f64 = 360.0;
+const COPIED_NOTICE_DURATION_MS: u64 = 2600;
+
+/// Brief notice that the text was copied instead of pasted, then auto-hide.
+pub fn show_copied_notice(app_handle: &AppHandle, reason: crate::focus_target::CopyReason) {
+    let state = match reason {
+        crate::focus_target::CopyReason::TargetChanged => "copied_target_changed",
+        crate::focus_target::CopyReason::TerminalMultiline => "copied_terminal",
+    };
+    OVERLAY_PICKER_OPEN.store(false, Ordering::SeqCst);
+    OVERLAY_TRANSLATE_MODE.store(false, Ordering::SeqCst);
+    show_overlay_state(app_handle, state);
+    let handle = app_handle.clone();
+    std::thread::spawn(move || {
+        // Wait for the show to land, then hide unless a newer session showed.
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        let shown = OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst);
+        std::thread::sleep(std::time::Duration::from_millis(COPIED_NOTICE_DURATION_MS));
+        if OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst) == shown {
+            hide_recording_overlay(&handle);
         }
     });
 }

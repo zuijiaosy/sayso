@@ -324,3 +324,19 @@ body,
   opacity: 0.4;
   cursor: default;
 }
+
+/* ---- copied-instead-of-pasted notice ---- */
+.vl-notice {
+  gap: 8px;
+  padding: 0 14px;
+  max-width: 352px;
+}
+.vl-notice svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.vl-notice .vl-work-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
