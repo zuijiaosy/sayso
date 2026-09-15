@@ -185,7 +185,7 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
             disabled={pending !== null}
             onClick={async () => {
               setPending("cloud");
-              await updateSetting("asr_provider", "dashscope");
+              await updateSetting("asr_provider", "cloud");
               await commands.completeOnboarding();
               onDone("models");
             }}

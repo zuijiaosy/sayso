@@ -797,8 +797,8 @@
         "description": "Turns your voice into text.",
         "local": "On device",
         "localDesc": "Runs offline; audio never leaves this Mac.",
-        "cloud": "Alibaba Cloud Model Studio",
-        "cloudDesc": "Audio is uploaded to Alibaba Cloud Qwen-ASR."
+        "cloud": "Cloud",
+        "cloudDesc": "Audio is uploaded to the selected provider."
       },
       "local": {
         "title": "Local model",
@@ -820,7 +820,7 @@
         "empty": "No local model is available yet"
       },
       "cloud": {
-        "title": "Model Studio Qwen-ASR",
+        "title": "Cloud recognition",
         "endpoint": "Endpoint",
         "endpointDesc": "Defaults to https://dashscope.aliyuncs.com. For a workspace, use the address shown in the console.",
         "apiKey": "API key",
@@ -832,7 +832,10 @@
         "sendDictionaryDesc": "Dictionary terms are sent along with the audio.",
         "testOk": "Connected ({{ms}} ms)",
         "testFailed": "Connection failed: {{error}}",
-        "saveFailed": "Could not save: {{error}}"
+        "saveFailed": "Could not save: {{error}}",
+        "vendor": "Provider",
+        "vendorDashscope": "Alibaba Cloud Qwen-ASR",
+        "vendorGlm": "Zhipu GLM-ASR"
       },
       "text": {
         "title": "Text model",
@@ -854,6 +857,12 @@
           "fixDesc": "Fix misheard words, sentence breaks and punctuation only.",
           "polishDesc": "Remove fillers and smooth phrasing without changing the meaning."
         }
+      },
+      "glm": {
+        "endpointDesc": "Defaults to https://open.bigmodel.cn/api/paas/v4.",
+        "apiKeyDesc": "An API key from the Zhipu BigModel platform (bigmodel.cn).",
+        "sendDictionary": "Send dictionary as hotwords",
+        "sendDictionaryDesc": "Up to 100 terms. GLM-ASR accepts 30 seconds per request; longer recordings are split automatically."
       }
     },
     "dictionary": {
@@ -931,8 +940,8 @@
       "downloadDesc": "About 152 MB. Offline recognition for Chinese, English, Japanese, Korean and Cantonese.",
       "import": "Use an existing model folder",
       "importDesc": "If you already have the sherpa-onnx SenseVoice int8 model, skip the download.",
-      "cloud": "Use Alibaba Cloud Model Studio",
-      "cloudDesc": "Audio is uploaded. Add the API key later under Models.",
+      "cloud": "Use cloud recognition",
+      "cloudDesc": "Alibaba Cloud or Zhipu GLM; audio is uploaded. Add the API key later under Models.",
       "finishing": "Enabling the model…"
     }
   }

@@ -268,8 +268,41 @@ pub enum AsrProviderKind {
     /// On-device model (default; audio never leaves the Mac).
     #[default]
     Local,
-    /// Alibaba Cloud Model Studio Qwen-ASR (audio is uploaded).
+    /// A cloud provider chosen by `cloud_asr_provider` (audio is uploaded).
+    /// `dashscope` is the value stored by 0.1 builds before GLM was added.
+    #[serde(alias = "dashscope")]
+    Cloud,
+}
+
+/// Cloud speech recognition vendors.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CloudAsrProvider {
+    /// Alibaba Cloud Model Studio Qwen-ASR.
+    #[default]
     Dashscope,
+    /// Zhipu BigModel GLM-ASR.
+    Glm,
+}
+
+/// Settings for Zhipu GLM-ASR. The API key is stored in `asr_api_keys["glm"]`.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Type)]
+#[serde(default)]
+pub struct GlmAsrSettings {
+    pub endpoint: String,
+    pub model: String,
+    /// Send dictionary terms as hotwords.
+    pub send_dictionary: bool,
+}
+
+impl Default for GlmAsrSettings {
+    fn default() -> Self {
+        Self {
+            endpoint: crate::asr::glm::DEFAULT_ENDPOINT.to_string(),
+            model: crate::asr::glm::DEFAULT_MODEL.to_string(),
+            send_dictionary: true,
+        }
+    }
 }
 
 /// Settings for the DashScope Qwen-ASR provider. The API key is stored in
@@ -593,7 +626,11 @@ pub struct AppSettings {
     #[serde(default)]
     pub asr_provider: AsrProviderKind,
     #[serde(default)]
+    pub cloud_asr_provider: CloudAsrProvider,
+    #[serde(default)]
     pub dashscope_asr: DashScopeAsrSettings,
+    #[serde(default)]
+    pub glm_asr: GlmAsrSettings,
     /// API keys for cloud ASR providers, keyed by provider id.
     #[serde(default)]
     pub asr_api_keys: SecretMap,
@@ -1093,7 +1130,9 @@ pub fn get_default_settings() -> AppSettings {
         translate_target_language: default_translate_target_language(),
         dictionary: Vec::new(),
         asr_provider: AsrProviderKind::default(),
+        cloud_asr_provider: CloudAsrProvider::default(),
         dashscope_asr: DashScopeAsrSettings::default(),
+        glm_asr: GlmAsrSettings::default(),
         asr_api_keys: SecretMap::default(),
     }
 }
@@ -1684,6 +1723,17 @@ mod tests {
         assert_eq!(settings.translate_target_language, "en-US");
         assert!(settings.reliable_paste);
         assert!(settings.start_hidden);
+    }
+
+    #[test]
+    fn legacy_dashscope_asr_provider_loads_as_cloud_bailian() {
+        let settings: AppSettings =
+            serde_json::from_value(serde_json::json!({ "asr_provider": "dashscope" })).unwrap();
+        assert_eq!(settings.asr_provider, AsrProviderKind::Cloud);
+        assert_eq!(settings.cloud_asr_provider, CloudAsrProvider::Dashscope);
+        assert_eq!(settings.glm_asr.model, "glm-asr-2512");
+        let json = serde_json::to_value(&settings).unwrap();
+        assert_eq!(json["asr_provider"], "cloud");
     }
 
     #[test]

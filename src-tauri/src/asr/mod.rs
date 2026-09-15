@@ -4,6 +4,7 @@
 //! providers that upload the recorded audio after the user stops speaking.
 
 pub mod dashscope;
+pub mod glm;
 
 use std::io::Cursor;
 
@@ -74,6 +75,39 @@ pub fn dashscope_request(
         model: cfg.model.clone(),
         language: Some(cfg.language.clone()),
         context,
+    }
+}
+
+pub fn glm_request(settings: &crate::settings::AppSettings) -> glm::GlmAsrRequest {
+    let cfg = &settings.glm_asr;
+    glm::GlmAsrRequest {
+        endpoint: cfg.endpoint.clone(),
+        api_key: settings
+            .asr_api_keys
+            .get(glm::PROVIDER_ID)
+            .cloned()
+            .unwrap_or_default(),
+        model: cfg.model.clone(),
+        hotwords: if cfg.send_dictionary {
+            glm::hotwords_from_terms(settings.dictionary.iter().map(|e| e.term.as_str()))
+        } else {
+            Vec::new()
+        },
+    }
+}
+
+/// Recognize with the cloud vendor selected in settings.
+pub async fn transcribe_cloud(
+    settings: &crate::settings::AppSettings,
+    samples: &[f32],
+) -> Result<String, AsrError> {
+    match settings.cloud_asr_provider {
+        crate::settings::CloudAsrProvider::Dashscope => {
+            dashscope::transcribe(&dashscope_request(settings), samples).await
+        }
+        crate::settings::CloudAsrProvider::Glm => {
+            glm::transcribe(&glm_request(settings), samples).await
+        }
     }
 }
 

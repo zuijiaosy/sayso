@@ -527,7 +527,7 @@ impl ShortcutAction for TranscribeAction {
         // local model.
         let kickoff_started = Instant::now();
         let uses_cloud_asr =
-            get_settings(app).asr_provider == crate::settings::AsrProviderKind::Dashscope;
+            get_settings(app).asr_provider == crate::settings::AsrProviderKind::Cloud;
         if !uses_cloud_asr {
             tm.initiate_model_load();
         }
@@ -792,34 +792,32 @@ impl ShortcutAction for TranscribeAction {
                     // fed to the stream); otherwise batch-transcribe the samples.
                     let transcription_time = Instant::now();
                     let asr_settings = get_settings(&ah);
-                    let transcription_result = if asr_settings.asr_provider
-                        == crate::settings::AsrProviderKind::Dashscope
-                    {
-                        tm.cancel_stream();
-                        let request = crate::asr::dashscope_request(&asr_settings);
-                        match complete_unless_cancelled(
-                            crate::asr::dashscope::transcribe(&request, &samples),
-                            || rm.was_cancelled_since(cancel_generation),
-                        )
-                        .await
-                        {
-                            // Cancelled: the check after the WAV save returns early.
-                            None => Err(anyhow::anyhow!("cancelled")),
-                            Some(result) => result.map_err(|e| anyhow::anyhow!(e.to_string())),
-                        }
-                    } else {
-                        match tm.finalize_stream() {
-                            // A finalized stream with usable text wins. An empty result
-                            // (no active stream, produced nothing, or a finalize error
-                            // after the engine was returned) falls back to a full batch
-                            // transcription of the same audio. A finalize timeout is
-                            // surfaced instead — the worker may still hold the engine,
-                            // so a batch fallback would contend with it.
-                            Ok(Some(text)) if !text.trim().is_empty() => Ok(text),
-                            Ok(_) => tm.transcribe(samples),
-                            Err(err) => Err(err),
-                        }
-                    };
+                    let transcription_result =
+                        if asr_settings.asr_provider == crate::settings::AsrProviderKind::Cloud {
+                            tm.cancel_stream();
+                            match complete_unless_cancelled(
+                                crate::asr::transcribe_cloud(&asr_settings, &samples),
+                                || rm.was_cancelled_since(cancel_generation),
+                            )
+                            .await
+                            {
+                                // Cancelled: the check after the WAV save returns early.
+                                None => Err(anyhow::anyhow!("cancelled")),
+                                Some(result) => result.map_err(|e| anyhow::anyhow!(e.to_string())),
+                            }
+                        } else {
+                            match tm.finalize_stream() {
+                                // A finalized stream with usable text wins. An empty result
+                                // (no active stream, produced nothing, or a finalize error
+                                // after the engine was returned) falls back to a full batch
+                                // transcription of the same audio. A finalize timeout is
+                                // surfaced instead — the worker may still hold the engine,
+                                // so a batch fallback would contend with it.
+                                Ok(Some(text)) if !text.trim().is_empty() => Ok(text),
+                                Ok(_) => tm.transcribe(samples),
+                                Err(err) => Err(err),
+                            }
+                        };
 
                     // Await WAV save and verify
                     let wav_saved = match wav_handle.await {

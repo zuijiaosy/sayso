@@ -12,7 +12,9 @@ import {
 import {
   commands,
   type AsrProviderKind,
+  type CloudAsrProvider,
   type DashScopeAsrSettings,
+  type GlmAsrSettings,
   type DictationPostMode,
   type ModelInfo,
 } from "@/bindings";
@@ -254,20 +256,50 @@ const LANGUAGE_CODES = [
   "id",
 ];
 
-const CloudAsrForm: React.FC = () => {
+/** API key field saved on blur to `asr_api_keys[vendor]`. */
+const CloudApiKeyRow: React.FC<{
+  vendor: "dashscope" | "glm";
+  description: string;
+}> = ({ vendor, description }) => {
+  const { t } = useTranslation();
+  const { settings, refreshSettings } = useSettings();
+  const stored = settings?.asr_api_keys?.[vendor] ?? "";
+  const [apiKey, setApiKey] = useState(stored);
+  useEffect(() => setApiKey(stored), [stored]);
+
+  return (
+    <Row
+      title={t("voiceless.models.cloud.apiKey")}
+      description={description}
+      stacked
+    >
+      <TextInput
+        className="w-full"
+        type="password"
+        autoComplete="off"
+        value={apiKey}
+        placeholder="sk-…"
+        onChange={(e) => setApiKey(e.target.value)}
+        onBlur={async () => {
+          if (apiKey === stored) return;
+          const result = await commands.setAsrApiKey(vendor, apiKey);
+          if (result.status === "error") toast.error(result.error);
+          await refreshSettings();
+        }}
+      />
+    </Row>
+  );
+};
+
+const DashscopeForm: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const { settings, updateSetting, refreshSettings } = useSettings();
+  const { settings, updateSetting } = useSettings();
   const stored = settings?.dashscope_asr;
   const [draft, setDraft] = useState<DashScopeAsrSettings | null>(null);
-  const [apiKey, setApiKey] = useState("");
-  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     if (stored && !draft) setDraft(stored);
   }, [stored, draft]);
-  useEffect(() => {
-    setApiKey(settings?.asr_api_keys?.dashscope ?? "");
-  }, [settings?.asr_api_keys?.dashscope]);
 
   if (!draft) return null;
 
@@ -289,27 +321,6 @@ const CloudAsrForm: React.FC = () => {
     await updateSetting("dashscope_asr", next);
   };
 
-  const saveKey = async () => {
-    const result = await commands.setAsrApiKey("dashscope", apiKey);
-    if (result.status === "error") toast.error(result.error);
-    await refreshSettings();
-  };
-
-  const test = async () => {
-    setTesting(true);
-    await saveKey();
-    await updateSetting("dashscope_asr", draft);
-    const result = await commands.testDashscopeAsr();
-    setTesting(false);
-    if (result.status === "ok") {
-      toast.success(t("voiceless.models.cloud.testOk", { ms: result.data }));
-    } else {
-      toast.error(
-        t("voiceless.models.cloud.testFailed", { error: result.error }),
-      );
-    }
-  };
-
   return (
     <>
       <Row
@@ -325,21 +336,10 @@ const CloudAsrForm: React.FC = () => {
           onBlur={() => void save(draft)}
         />
       </Row>
-      <Row
-        title={t("voiceless.models.cloud.apiKey")}
+      <CloudApiKeyRow
+        vendor="dashscope"
         description={t("voiceless.models.cloud.apiKeyDesc")}
-        stacked
-      >
-        <TextInput
-          className="w-full"
-          type="password"
-          autoComplete="off"
-          value={apiKey}
-          placeholder="sk-…"
-          onChange={(e) => setApiKey(e.target.value)}
-          onBlur={() => void saveKey()}
-        />
-      </Row>
+      />
       <Row title={t("voiceless.models.cloud.model")}>
         <TextInput
           className="w-56"
@@ -372,6 +372,118 @@ const CloudAsrForm: React.FC = () => {
           }
         />
       </Row>
+    </>
+  );
+};
+
+const GlmForm: React.FC = () => {
+  const { t } = useTranslation();
+  const { settings, updateSetting } = useSettings();
+  const stored = settings?.glm_asr;
+  const [draft, setDraft] = useState<GlmAsrSettings | null>(null);
+
+  useEffect(() => {
+    if (stored && !draft) setDraft(stored);
+  }, [stored, draft]);
+
+  if (!draft) return null;
+
+  const save = async (next: GlmAsrSettings) => {
+    setDraft(next);
+    await updateSetting("glm_asr", next);
+  };
+
+  return (
+    <>
+      <Row
+        title={t("voiceless.models.cloud.endpoint")}
+        description={t("voiceless.models.glm.endpointDesc")}
+        stacked
+      >
+        <TextInput
+          className="w-full"
+          value={draft.endpoint}
+          spellCheck={false}
+          onChange={(e) => setDraft({ ...draft, endpoint: e.target.value })}
+          onBlur={() => void save(draft)}
+        />
+      </Row>
+      <CloudApiKeyRow
+        vendor="glm"
+        description={t("voiceless.models.glm.apiKeyDesc")}
+      />
+      <Row title={t("voiceless.models.cloud.model")}>
+        <TextInput
+          className="w-56"
+          value={draft.model}
+          spellCheck={false}
+          onChange={(e) => setDraft({ ...draft, model: e.target.value })}
+          onBlur={() => void save(draft)}
+        />
+      </Row>
+      <Row
+        title={t("voiceless.models.glm.sendDictionary")}
+        description={t("voiceless.models.glm.sendDictionaryDesc")}
+      >
+        <Switch
+          checked={draft.send_dictionary}
+          onChange={(checked) =>
+            void save({ ...draft, send_dictionary: checked })
+          }
+        />
+      </Row>
+    </>
+  );
+};
+
+const CloudAsrSection: React.FC = () => {
+  const { t } = useTranslation();
+  const { settings, refreshSettings } = useSettings();
+  const vendor: CloudAsrProvider = settings?.cloud_asr_provider ?? "dashscope";
+  const [testing, setTesting] = useState(false);
+
+  const test = async () => {
+    // Let pending blur saves land first.
+    (document.activeElement as HTMLElement | null)?.blur();
+    await new Promise((r) => setTimeout(r, 150));
+    setTesting(true);
+    const result = await commands.testCloudAsr();
+    setTesting(false);
+    if (result.status === "ok") {
+      toast.success(t("voiceless.models.cloud.testOk", { ms: result.data }));
+    } else {
+      toast.error(
+        t("voiceless.models.cloud.testFailed", { error: result.error }),
+      );
+    }
+  };
+
+  return (
+    <Section
+      icon={<Cloud size={20} />}
+      title={t("voiceless.models.cloud.title")}
+    >
+      <Row title={t("voiceless.models.cloud.vendor")}>
+        <SelectInput
+          value={vendor}
+          onChange={async (e) => {
+            await commands.updateCloudAsrProvider(
+              e.target.value as CloudAsrProvider,
+            );
+            await refreshSettings();
+          }}
+        >
+          <option value="dashscope">
+            {t("voiceless.models.cloud.vendorDashscope")}
+          </option>
+          <option value="glm">{t("voiceless.models.cloud.vendorGlm")}</option>
+        </SelectInput>
+      </Row>
+      {vendor === "glm" ? (
+        <GlmForm key="glm" />
+      ) : (
+        <DashscopeForm key="dashscope" />
+      )}
       <div className="py-3">
         <Button
           variant="secondary"
@@ -382,7 +494,7 @@ const CloudAsrForm: React.FC = () => {
           {testing ? t("voiceless.common.testing") : t("voiceless.common.test")}
         </Button>
       </div>
-    </>
+    </Section>
   );
 };
 
@@ -553,13 +665,22 @@ const TextModelSection: React.FC = () => {
 
 export const ModelsPage: React.FC = () => {
   const { t } = useTranslation();
-  const { settings, updateSetting } = useSettings();
+  const { settings, refreshSettings } = useSettings();
   const initializeModels = useModelStore((s) => s.initialize);
   useEffect(() => {
     void initializeModels();
   }, [initializeModels]);
 
-  const provider = settings?.asr_provider ?? "local";
+  const provider: AsrProviderKind = settings?.asr_provider ?? "local";
+
+  const switchProvider = async (value: AsrProviderKind) => {
+    try {
+      await commands.updateAsrProvider(value);
+    } catch (error) {
+      toast.error(String(error));
+    }
+    await refreshSettings();
+  };
 
   return (
     <Page title={t("voiceless.models.title")}>
@@ -582,23 +703,16 @@ export const ModelsPage: React.FC = () => {
         >
           <Segmented<AsrProviderKind>
             value={provider}
-            onChange={(value) => void updateSetting("asr_provider", value)}
+            onChange={(value) => void switchProvider(value)}
             options={[
               { value: "local", label: t("voiceless.models.asr.local") },
-              { value: "dashscope", label: t("voiceless.models.asr.cloud") },
+              { value: "cloud", label: t("voiceless.models.asr.cloud") },
             ]}
           />
         </Row>
         {provider === "local" ? <LocalModels /> : null}
       </Section>
-      {provider === "dashscope" && (
-        <Section
-          icon={<Cloud size={20} />}
-          title={t("voiceless.models.cloud.title")}
-        >
-          <CloudAsrForm />
-        </Section>
-      )}
+      {provider === "cloud" && <CloudAsrSection />}
       <TextModelSection />
     </Page>
   );

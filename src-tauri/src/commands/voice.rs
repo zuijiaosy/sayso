@@ -2,8 +2,8 @@
 
 use crate::actions::{paste_and_finish, run_text_model, show_translation_failure};
 use crate::settings::{
-    get_settings, write_settings, AsrProviderKind, DashScopeAsrSettings, DictationPostMode,
-    DictionaryEntry,
+    get_settings, write_settings, AsrProviderKind, CloudAsrProvider, DashScopeAsrSettings,
+    DictationPostMode, DictionaryEntry, GlmAsrSettings,
 };
 use crate::tray::{set_tray_state, TrayIconState};
 use crate::utils;
@@ -174,6 +174,46 @@ pub fn update_asr_provider(app: AppHandle, provider: AsrProviderKind) {
     let mut settings = get_settings(&app);
     settings.asr_provider = provider;
     write_settings(&app, settings);
+    log::info!("Speech recognition set to {provider:?}");
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn update_cloud_asr_provider(app: AppHandle, provider: CloudAsrProvider) {
+    let mut settings = get_settings(&app);
+    settings.cloud_asr_provider = provider;
+    write_settings(&app, settings);
+    log::info!("Cloud speech recognition vendor set to {provider:?}");
+}
+
+fn clean_endpoint(endpoint: &str) -> Result<String, String> {
+    let endpoint = endpoint.trim().trim_end_matches('/').to_string();
+    if endpoint.starts_with("https://") || endpoint.starts_with("http://") {
+        Ok(endpoint)
+    } else {
+        Err("Endpoint must start with https://".to_string())
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn update_glm_asr_settings(
+    app: AppHandle,
+    config: GlmAsrSettings,
+) -> Result<GlmAsrSettings, String> {
+    let model = config.model.trim().to_string();
+    if model.is_empty() {
+        return Err("Model cannot be empty".to_string());
+    }
+    let cleaned = GlmAsrSettings {
+        endpoint: clean_endpoint(&config.endpoint)?,
+        model,
+        send_dictionary: config.send_dictionary,
+    };
+    let mut settings = get_settings(&app);
+    settings.glm_asr = cleaned.clone();
+    write_settings(&app, settings);
+    Ok(cleaned)
 }
 
 #[tauri::command]
@@ -209,7 +249,7 @@ pub fn update_dashscope_asr_settings(
 #[tauri::command]
 #[specta::specta]
 pub fn set_asr_api_key(app: AppHandle, provider: String, api_key: String) -> Result<(), String> {
-    if provider != crate::asr::dashscope::PROVIDER_ID {
+    if provider != crate::asr::dashscope::PROVIDER_ID && provider != crate::asr::glm::PROVIDER_ID {
         return Err(format!("Unknown ASR provider: {provider}"));
     }
     let mut settings = get_settings(&app);
@@ -220,16 +260,15 @@ pub fn set_asr_api_key(app: AppHandle, provider: String, api_key: String) -> Res
     Ok(())
 }
 
-/// Check the DashScope key and endpoint with one second of silence.
-/// Returns the latency in milliseconds.
+/// Check the selected cloud vendor's key and endpoint with one second of
+/// silence. Returns the latency in milliseconds.
 #[tauri::command]
 #[specta::specta]
-pub async fn test_dashscope_asr(app: AppHandle) -> Result<u32, String> {
+pub async fn test_cloud_asr(app: AppHandle) -> Result<u32, String> {
     let settings = get_settings(&app);
-    let request = crate::asr::dashscope_request(&settings);
     let started = std::time::Instant::now();
     let silence = vec![0.0f32; crate::asr::SAMPLE_RATE as usize];
-    crate::asr::dashscope::transcribe(&request, &silence)
+    crate::asr::transcribe_cloud(&settings, &silence)
         .await
         .map_err(|e| e.to_string())?;
     Ok(started.elapsed().as_millis().min(u32::MAX as u128) as u32)

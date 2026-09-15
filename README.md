@@ -13,7 +13,7 @@ Voiceless 派生自开源项目 [Handy](https://github.com/cjpais/Handy)（MIT�
 | 口述 | 默认 `Fn`。短按开始、再按结束；也可以按住说话、松开结束 |
 | 翻译 | 默认 `Fn + 左 Shift`。悬浮条上可切换目标语言；先按住 Fn 再按左 Shift，会把正在进行的口述转为翻译 |
 | 悬浮条 | 屏幕底部黑色胶囊：✕ 取消、实时波形、✓ 完成；不抢走当前输入框的焦点 |
-| 语音识别 | 默认本地 SenseVoice（离线，中/英/日/韩/粤）；可选阿里云百炼 `qwen3-asr-flash` |
+| 语音识别 | 默认本地 SenseVoice（离线，中/英/日/韩/粤）；云端可选阿里云百炼 `qwen3-asr-flash` 或智谱 `glm-asr-2512` |
 | 文本模型 | 预设 DeepSeek `deepseek-flash`（已关闭思考模式）、阿里云百炼，以及任意 OpenAI 兼容接口 |
 | 口述整理 | 关闭 / 仅纠错 / 整理（默认） |
 | 词典 | 标准写法、常见误识别（字面替换）、固定译法、备注；支持文本导入导出 |
@@ -24,7 +24,7 @@ Voiceless 派生自开源项目 [Handy](https://github.com/cjpais/Handy)（MIT�
 |---|---|---|
 | 本地识别，整理关闭 | 不出本机 | 不出本机 |
 | 本地识别 + DeepSeek 等文本模型 | 不出本机 | 识别结果和相关词条发往所选服务 |
-| 百炼云端识别 | 上传到阿里云 | 取决于文本模型设置 |
+| 云端识别（百炼或智谱 GLM） | 上传到所选服务商 | 取决于文本模型设置 |
 
 - **不会静默切换到云端。** 本地识别失败时不会自动改用云端。
 - **翻译失败时不会插入原文。** 悬浮条会给出「重试」和「复制原文」。
@@ -36,7 +36,7 @@ Voiceless 派生自开源项目 [Handy](https://github.com/cjpais/Handy)（MIT�
 1. 构建或下载 `Voiceless.app`，放进「应用程序」文件夹。
 2. 打开后按引导授予 **麦克风**、**辅助功能**、**输入监控**。
 3. 系统设置 → 键盘 →「按下 🌐 键时」改为 **不执行任何操作**，否则按 Fn 会同时切换输入法。
-4. 选择语音识别：下载 SenseVoice（约 152 MB）、导入已有的 sherpa-onnx SenseVoice int8 文件夹，或使用百炼。
+4. 选择语音识别：下载 SenseVoice（约 152 MB）、导入已有的 sherpa-onnx SenseVoice int8 文件夹，或使用云端识别（阿里云百炼 / 智谱 GLM）。
 5. 如需整理或翻译，在「模型 → 文本模型」填写 DeepSeek 或其他服务的 API Key，点「测试」。
 
 **已知限制**
@@ -44,6 +44,7 @@ Voiceless 派生自开源项目 [Handy](https://github.com/cjpais/Handy)（MIT�
 - Fn 键只在 Apple 键盘上有效，第三方键盘请在「快捷键」里「添加另一个」。
 - 自签名构建每次重新安装后，macOS 可能需要重新授予辅助功能和输入监控权限。
 - 密码框等「安全输入」场景下，系统会阻止模拟粘贴。
+- 智谱 GLM-ASR 的多个热词如何编码，官方文档没有写明。Voiceless 按官方 SDK 的方式发送，被服务端拒绝时会自动去掉热词重试。
 
 ## 开发
 
@@ -72,7 +73,7 @@ cd src-tauri && VOICELESS_LIVE_TESTS=1 cargo test --lib live_ -- --ignored
 | `src-tauri/src/voice.rs` | 模式、提示词、词典替换、模型输出校验 |
 | `src-tauri/src/actions.rs` | 录音结束后的识别 → 整理/翻译 → 粘贴流水线 |
 | `src-tauri/src/transcription_coordinator.rs` | 热键状态机（含 Fn → Fn+Shift 升级） |
-| `src-tauri/src/asr/` | 百炼 Qwen-ASR 适配器 |
+| `src-tauri/src/asr/` | 云端识别适配器：百炼 Qwen-ASR（单次 ≤10 MB，按 3 分钟分段）、智谱 GLM-ASR（单次 ≤30 秒，按 28 秒分段并行） |
 | `src/voiceless/` | 设置界面与首次引导 |
 | `src/overlay/` | 录音悬浮条 |
 

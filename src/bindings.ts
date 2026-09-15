@@ -643,12 +643,23 @@ async setAsrApiKey(provider: string, apiKey: string) : Promise<Result<null, stri
 }
 },
 /**
- * Check the DashScope key and endpoint with one second of silence.
- * Returns the latency in milliseconds.
+ * Check the selected cloud vendor's key and endpoint with one second of
+ * silence. Returns the latency in milliseconds.
  */
-async testDashscopeAsr() : Promise<Result<number, string>> {
+async testCloudAsr() : Promise<Result<number, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("test_dashscope_asr") };
+    return { status: "ok", data: await TAURI_INVOKE("test_cloud_asr") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateCloudAsrProvider(provider: CloudAsrProvider) : Promise<void> {
+    await TAURI_INVOKE("update_cloud_asr_provider", { provider });
+},
+async updateGlmAsrSettings(config: GlmAsrSettings) : Promise<Result<GlmAsrSettings, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_glm_asr_settings", { config }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1191,7 +1202,7 @@ dictionary?: DictionaryEntry[];
 /**
  * Voiceless: speech recognition engine.
  */
-asr_provider?: AsrProviderKind; dashscope_asr?: DashScopeAsrSettings; 
+asr_provider?: AsrProviderKind; cloud_asr_provider?: CloudAsrProvider; dashscope_asr?: DashScopeAsrSettings; glm_asr?: GlmAsrSettings; 
 /**
  * API keys for cloud ASR providers, keyed by provider id.
  */
@@ -1205,14 +1216,27 @@ export type AsrProviderKind =
  */
 "local" | 
 /**
- * Alibaba Cloud Model Studio Qwen-ASR (audio is uploaded).
+ * A cloud provider chosen by `cloud_asr_provider` (audio is uploaded).
+ * `dashscope` is the value stored by 0.1 builds before GLM was added.
  */
-"dashscope"
+"cloud"
 export type AudioDevice = { index: string; name: string; is_default: boolean }
 export type AutoSubmitKey = "enter" | "ctrl_enter" | "cmd_enter"
 export type AvailableAccelerators = { transcribe: string[]; ort: string[]; gpu_devices: GpuDeviceOption[] }
 export type BindingResponse = { success: boolean; binding: ShortcutBinding | null; error: string | null }
 export type ClipboardHandling = "dont_modify" | "copy_to_clipboard"
+/**
+ * Cloud speech recognition vendors.
+ */
+export type CloudAsrProvider = 
+/**
+ * Alibaba Cloud Model Studio Qwen-ASR.
+ */
+"dashscope" | 
+/**
+ * Zhipu BigModel GLM-ASR.
+ */
+"glm"
 export type CustomSounds = { start: boolean; stop: boolean }
 /**
  * Settings for the DashScope Qwen-ASR provider. The API key is stored in
@@ -1303,6 +1327,14 @@ action: string;
  * True when a bare Fn shortcut will not collide with a system action.
  */
 compatible: boolean }
+/**
+ * Settings for Zhipu GLM-ASR. The API key is stored in `asr_api_keys["glm"]`.
+ */
+export type GlmAsrSettings = { endpoint: string; model: string; 
+/**
+ * Send dictionary terms as hotwords.
+ */
+send_dictionary: boolean }
 export type GpuDeviceOption = { id: string; name: string; total_vram_mb: number }
 export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string; post_processed_text: string | null; post_process_prompt: string | null; post_process_requested: boolean }
 export type HistoryUpdatePayload = { action: "added"; entry: HistoryEntry } | { action: "updated"; entry: HistoryEntry } | { action: "deleted"; id: number } | { action: "toggled"; id: number }

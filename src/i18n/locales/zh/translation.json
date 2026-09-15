@@ -797,8 +797,8 @@
         "description": "把声音转成文字。",
         "local": "本地识别",
         "localDesc": "离线运行，音频不会离开这台 Mac。",
-        "cloud": "阿里云百炼",
-        "cloudDesc": "音频会上传到阿里云 Qwen-ASR 识别。"
+        "cloud": "云端识别",
+        "cloudDesc": "音频会上传到所选服务商识别。"
       },
       "local": {
         "title": "本地模型",
@@ -820,7 +820,7 @@
         "empty": "还没有可用的本地模型"
       },
       "cloud": {
-        "title": "阿里云百炼 Qwen-ASR",
+        "title": "云端识别",
         "endpoint": "服务地址",
         "endpointDesc": "默认 https://dashscope.aliyuncs.com。使用业务空间时，填写控制台给出的地址。",
         "apiKey": "API Key",
@@ -832,7 +832,10 @@
         "sendDictionaryDesc": "词典中的标准写法会随音频一起发送。",
         "testOk": "连接成功（{{ms}} 毫秒）",
         "testFailed": "连接失败：{{error}}",
-        "saveFailed": "保存失败：{{error}}"
+        "saveFailed": "保存失败：{{error}}",
+        "vendor": "服务商",
+        "vendorDashscope": "阿里云百炼 Qwen-ASR",
+        "vendorGlm": "智谱 GLM-ASR"
       },
       "text": {
         "title": "文本模型",
@@ -854,6 +857,12 @@
           "fixDesc": "只修正错字、断句和标点。",
           "polishDesc": "去掉口头语、理顺表达，不改变意思。"
         }
+      },
+      "glm": {
+        "endpointDesc": "默认 https://open.bigmodel.cn/api/paas/v4。",
+        "apiKeyDesc": "在智谱开放平台（bigmodel.cn）创建的 API Key。",
+        "sendDictionary": "把词典作为热词",
+        "sendDictionaryDesc": "最多发送 100 个标准写法。GLM-ASR 单次最长 30 秒，更长的录音会自动分段识别。"
       }
     },
     "dictionary": {
@@ -931,8 +940,8 @@
       "downloadDesc": "约 152 MB。离线识别中文、英文、日语、韩语和粤语。",
       "import": "使用已有的模型文件夹",
       "importDesc": "已有 sherpa-onnx SenseVoice int8 模型时，无需重新下载。",
-      "cloud": "使用阿里云百炼",
-      "cloudDesc": "音频上传识别。稍后在「模型」中填写 API Key。",
+      "cloud": "使用云端识别",
+      "cloudDesc": "阿里云百炼或智谱 GLM，音频上传识别。稍后在「模型」中填写 API Key。",
       "finishing": "正在启用模型…"
     }
   }

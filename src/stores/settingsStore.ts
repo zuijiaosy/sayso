@@ -4,6 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import type {
   AppSettings as Settings,
   AsrProviderKind,
+  CloudAsrProvider,
+  GlmAsrSettings,
   AudioDevice,
   DashScopeAsrSettings,
   DictationPostMode,
@@ -216,6 +218,15 @@ const settingUpdaters: {
     }
   },
   dictionary: (value) => commands.updateDictionary(value as DictionaryEntry[]),
+  cloud_asr_provider: (value) =>
+    commands.updateCloudAsrProvider(value as CloudAsrProvider),
+  glm_asr: async (value) => {
+    const result = await commands.updateGlmAsrSettings(value as GlmAsrSettings);
+    if (result.status === "error") {
+      toast.error(result.error);
+      throw new Error(result.error);
+    }
+  },
 };
 
 export const useSettingsStore = create<SettingsStore>()(
