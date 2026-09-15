@@ -19,7 +19,7 @@ concurrency:
 jobs:
   build:
     permissions:
-      contents: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -42,4 +42,29 @@ jobs:
       asset-prefix: "voiceless"
       upload-artifacts: true
       sign-binaries: false
+      no-cache: false
     secrets: inherit
+
+  usage-notes:
+    name: "Download and install notes"
+    if: ${{ always() }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Add build summary
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Voiceless installers
+
+          Download the macOS and Windows installers from the **Artifacts** section of this workflow run.
+
+          The GitHub Actions builds are unsigned. After moving the macOS app to `/Applications`, verify that it came from this repository, then run:
+
+          ```bash
+          xattr -cr /Applications/Voiceless.app
+          ```
+          EOF
+          echo "Build result: ${BUILD_RESULT}" >> "$GITHUB_STEP_SUMMARY"
