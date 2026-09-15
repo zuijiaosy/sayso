@@ -42,7 +42,7 @@ Voiceless 派生自开源项目 [Handy](https://github.com/cjpais/Handy)（MIT�
 **已知限制**
 
 - Fn 键只在 Apple 键盘上有效，第三方键盘请在「快捷键」里「添加另一个」。
-- 自签名构建每次重新安装后，macOS 可能需要重新授予辅助功能和输入监控权限。
+- 未使用固定签名身份构建时，每次重新安装后都要重新授予辅助功能和输入监控权限。
 - 密码框等「安全输入」场景下，系统会阻止模拟粘贴。
 - 智谱 GLM-ASR 的多个热词如何编码，官方文档没有写明。Voiceless 按官方 SDK 的方式发送，被服务端拒绝时会自动去掉热词重试。
 
@@ -59,6 +59,18 @@ bun run lint && bunx tsc --noEmit                         # 前端检查
 ```
 
 在系统设置里授权时，请使用打包后的 `.app`：开发模式下运行的是裸二进制，系统设置的权限列表里找不到它。
+
+**签名与打包。** 用固定的签名身份构建，macOS 才会在重新安装后保留辅助功能和输入监控授权；自签名（`-`）每次构建都会让授权失效。
+
+```bash
+security find-identity -v -p codesigning        # 找到你的签名身份
+APPLE_SIGNING_IDENTITY="<身份 SHA-1>" CMAKE_POLICY_VERSION_MINIMUM=3.5 bun run tauri build --bundles app
+# Tauri 的 dmg 脚本需要控制访达；也可以直接用 hdiutil：
+cd src-tauri/target/release/bundle && mkdir dmg-stage && ditto macos/Voiceless.app dmg-stage/Voiceless.app \
+  && ln -s /Applications dmg-stage/Applications \
+  && hdiutil create -volname Voiceless -srcfolder dmg-stage -ov -format UDZO dmg/Voiceless_0.1.0_aarch64.dmg \
+  && rm -rf dmg-stage
+```
 
 可选的联网测试，使用无效 Key 验证服务端点：
 
