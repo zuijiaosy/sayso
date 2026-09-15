@@ -1,6 +1,6 @@
 {
   "tray": {
-    "settings": "Settings...",
+    "settings": "Settings…",
     "checkUpdates": "Check for Updates...",
     "copyLastTranscript": "Copy Last Transcript",
     "unloadModel": "Unload Model",
@@ -726,5 +726,212 @@
     "learnMore": "How to fix",
     "recorderBlocked": "Can't record shortcuts right now — macOS Secure Input is blocking key events. Resolve the Secure Input warning first.",
     "dismiss": "Dismiss"
+  },
+  "voiceless": {
+    "appName": "Voiceless",
+    "nav": {
+      "shortcuts": "Shortcuts",
+      "models": "Models",
+      "dictionary": "Dictionary",
+      "general": "General",
+      "permissions": "Permissions"
+    },
+    "common": {
+      "save": "Save",
+      "saved": "Saved",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "test": "Test",
+      "testing": "Testing…",
+      "loading": "Loading…",
+      "recheck": "Check again",
+      "openSystemSettings": "Open System Settings",
+      "notSet": "Not set"
+    },
+    "shortcuts": {
+      "title": "Keyboard shortcuts",
+      "dictate": {
+        "title": "Dictate",
+        "description": "Press to start and stop voice input."
+      },
+      "translate": {
+        "title": "Translate",
+        "description": "Press to start and stop translation."
+      },
+      "addAnother": "Add another",
+      "pressKeys": "Press keys…",
+      "remove": "Remove",
+      "reset": "Reset",
+      "activation": {
+        "title": "Activation",
+        "description": "Tap to start and tap again to finish, or hold while speaking and release to finish.",
+        "hold_or_toggle": "Tap to toggle + hold to talk",
+        "toggle": "Tap to toggle only",
+        "push_to_talk": "Hold to talk only"
+      },
+      "tips": "While recording: press Esc or click ✕ to cancel, click ✓ to finish. Holding Fn and then pressing Left Shift switches the current dictation to translation.",
+      "fnHardware": "Fn only works on Apple keyboards. Add another shortcut if you use a third-party keyboard.",
+      "fnWarning": {
+        "title": "The Fn key conflicts with a system setting",
+        "body": "System Settings → Keyboard → “Press 🌐 key to” is set to “{{action}}”. Change it to “Do Nothing”, otherwise Fn also triggers the system action.",
+        "open": "Open Keyboard Settings"
+      },
+      "fnActions": {
+        "do_nothing": "Do Nothing",
+        "change_input_source": "Change Input Source",
+        "emoji": "Show Emoji & Symbols",
+        "dictation": "Start Dictation",
+        "unknown": "Unknown"
+      },
+      "errors": {
+        "set": "Could not set shortcut: {{error}}",
+        "clear": "Could not remove shortcut: {{error}}"
+      }
+    },
+    "models": {
+      "title": "Models",
+      "asr": {
+        "title": "Speech recognition",
+        "description": "Turns your voice into text.",
+        "local": "On device",
+        "localDesc": "Runs offline; audio never leaves this Mac.",
+        "cloud": "Alibaba Cloud Model Studio",
+        "cloudDesc": "Audio is uploaded to Alibaba Cloud Qwen-ASR."
+      },
+      "local": {
+        "title": "Local model",
+        "chineseOnly": "Only models that support Chinese",
+        "recommended": "Recommended",
+        "download": "Download",
+        "cancel": "Cancel",
+        "use": "Use",
+        "inUse": "In use",
+        "delete": "Delete",
+        "downloading": "Downloading {{percent}}%",
+        "verifying": "Verifying…",
+        "extracting": "Extracting…",
+        "size": "{{size}} MB",
+        "import": "Import model folder",
+        "importDesc": "Choose a SenseVoice folder containing model.int8.onnx and tokens.txt. Nothing is downloaded.",
+        "importOk": "SenseVoice imported and enabled",
+        "importFailed": "Import failed: {{error}}",
+        "empty": "No local model is available yet"
+      },
+      "cloud": {
+        "title": "Model Studio Qwen-ASR",
+        "endpoint": "Endpoint",
+        "endpointDesc": "Defaults to https://dashscope.aliyuncs.com. For a workspace, use the address shown in the console.",
+        "apiKey": "API key",
+        "apiKeyDesc": "When empty, the key of the Model Studio text model below is used.",
+        "model": "Model",
+        "language": "Language",
+        "languageAuto": "Detect automatically",
+        "sendDictionary": "Send dictionary as context",
+        "sendDictionaryDesc": "Dictionary terms are sent along with the audio.",
+        "testOk": "Connected ({{ms}} ms)",
+        "testFailed": "Connection failed: {{error}}",
+        "saveFailed": "Could not save: {{error}}"
+      },
+      "text": {
+        "title": "Text model",
+        "description": "Polishes dictation and translates. When enabled, recognized text is sent to the selected service.",
+        "provider": "Provider",
+        "baseUrl": "Base URL",
+        "apiKey": "API key",
+        "model": "Model",
+        "fetchModels": "Fetch models",
+        "testOk": "Text model is working",
+        "testFailed": "Text model unavailable: {{error}}",
+        "notConfigured": "No text model is set up: dictation inserts the raw transcript and translation is unavailable.",
+        "mode": {
+          "title": "Dictation cleanup",
+          "off": "Off",
+          "fix": "Fix only",
+          "polish": "Polish",
+          "offDesc": "Insert the transcript as recognized (dictionary replacements still apply).",
+          "fixDesc": "Fix misheard words, sentence breaks and punctuation only.",
+          "polishDesc": "Remove fillers and smooth phrasing without changing the meaning."
+        }
+      }
+    },
+    "dictionary": {
+      "title": "Dictionary",
+      "description": "Names and terms, plus how they tend to be misheard. Misheard forms are replaced literally and the terms are passed to the text model; translation uses the fixed translations.",
+      "term": "Term",
+      "aliases": "Misheard as",
+      "aliasesPlaceholder": "Comma separated",
+      "translation": "Fixed translation",
+      "note": "Note",
+      "add": "Add entry",
+      "empty": "No entries yet. Add product names, people or jargon you say often.",
+      "search": "Search entries",
+      "import": "Import",
+      "export": "Copy as text",
+      "copied": "Copied to clipboard",
+      "importTitle": "Import dictionary",
+      "importPlaceholder": "One entry per line:\nterm | misheard 1, misheard 2 | translation | note\nor: misheard → term",
+      "importMerge": "Merge",
+      "importReplace": "Replace all",
+      "imported": "Imported {{count}} entries"
+    },
+    "general": {
+      "title": "General",
+      "autostart": "Launch at login",
+      "autostartDesc": "Run Voiceless in the menu bar after you log in.",
+      "targetLanguage": "Default translation language",
+      "targetLanguageDesc": "You can also switch it on the overlay while recording.",
+      "appLanguage": "Interface language",
+      "microphone": "Microphone",
+      "microphoneDesc": "Input device used for voice input.",
+      "overlayPosition": "Overlay position",
+      "overlayTop": "Top of screen",
+      "overlayBottom": "Bottom of screen",
+      "clipboard": "Keep result on clipboard",
+      "clipboardDesc": "After inserting text, also leave the result on the clipboard.",
+      "about": "About",
+      "version": "Version {{version}}",
+      "basedOn": "Based on the open-source Handy project (MIT).",
+      "openLogs": "Open logs folder",
+      "quit": "Quit Voiceless"
+    },
+    "permissions": {
+      "title": "Permissions",
+      "description": "Voiceless needs these permissions to type into any app.",
+      "microphone": {
+        "title": "Microphone",
+        "description": "Record your voice."
+      },
+      "accessibility": {
+        "title": "Accessibility",
+        "description": "Paste text into the focused field."
+      },
+      "inputMonitoring": {
+        "title": "Input Monitoring",
+        "description": "Detect global shortcuts such as Fn."
+      },
+      "granted": "Granted",
+      "grant": "Grant",
+      "restartHint": "If shortcuts still do nothing after granting, quit and reopen Voiceless.",
+      "fn": {
+        "title": "Fn key behavior",
+        "ok": "Set to “Do Nothing”",
+        "bad": "Currently “{{action}}”; “Do Nothing” is recommended"
+      }
+    },
+    "onboarding": {
+      "welcome": "Welcome to Voiceless",
+      "subtitle": "Press Fn, speak, and clean text appears at your cursor.",
+      "stepPermissions": "Step 1: Grant permissions",
+      "stepModel": "Step 2: Choose speech recognition",
+      "continue": "Continue",
+      "back": "Back",
+      "download": "Download SenseVoice",
+      "downloadDesc": "About 152 MB. Offline recognition for Chinese, English, Japanese, Korean and Cantonese.",
+      "import": "Use an existing model folder",
+      "importDesc": "If you already have the sherpa-onnx SenseVoice int8 model, skip the download.",
+      "cloud": "Use Alibaba Cloud Model Studio",
+      "cloudDesc": "Audio is uploaded. Add the API key later under Models.",
+      "finishing": "Enabling the model…"
+    }
   }
 }

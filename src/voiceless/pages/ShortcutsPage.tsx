@@ -1,0 +1,117 @@
+import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Keyboard } from "lucide-react";
+import { commands, type FnKeyUsage, type ShortcutActivation } from "@/bindings";
+import { Button } from "@/components/ui/Button";
+import { useSettings } from "@/hooks/useSettings";
+import { ShortcutField } from "../ShortcutField";
+import { Notice, Page, Row, Section, Segmented } from "../ui";
+
+export const useFnKeyUsage = () => {
+  const [usage, setUsage] = useState<FnKeyUsage | null>(null);
+  const refresh = () => {
+    commands
+      .getFnKeyUsage()
+      .then(setUsage)
+      .catch(() => setUsage(null));
+  };
+  useEffect(() => {
+    refresh();
+    const onFocus = () => refresh();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+  return { usage, refresh };
+};
+
+const usesFn = (binding?: string) =>
+  Boolean(binding?.split("+").some((p) => p.trim().toLowerCase() === "fn"));
+
+export const FnSettingNotice: React.FC<{ usage: FnKeyUsage | null }> = ({
+  usage,
+}) => {
+  const { t } = useTranslation();
+  if (!usage || usage.compatible || usage.action === "unknown") return null;
+  return (
+    <Notice
+      tone="warning"
+      title={t("voiceless.shortcuts.fnWarning.title")}
+      action={
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => void commands.openSystemSettingsPane("keyboard")}
+        >
+          {t("voiceless.shortcuts.fnWarning.open")}
+        </Button>
+      }
+    >
+      {t("voiceless.shortcuts.fnWarning.body", {
+        action: t(`voiceless.shortcuts.fnActions.${usage.action}`),
+      })}
+    </Notice>
+  );
+};
+
+export const ShortcutsPage: React.FC = () => {
+  const { t } = useTranslation();
+  const { settings, updateSetting } = useSettings();
+  const { usage } = useFnKeyUsage();
+
+  const anyFn =
+    usesFn(settings?.bindings?.transcribe?.current_binding) ||
+    usesFn(settings?.bindings?.translate?.current_binding);
+
+  return (
+    <Page title={t("voiceless.nav.shortcuts")}>
+      {anyFn && <FnSettingNotice usage={usage} />}
+      <Section
+        icon={<Keyboard size={20} />}
+        title={t("voiceless.shortcuts.title")}
+      >
+        <Row
+          title={t("voiceless.shortcuts.dictate.title")}
+          description={t("voiceless.shortcuts.dictate.description")}
+        >
+          <ShortcutField bindingId="transcribe" altBindingId="transcribe_alt" />
+        </Row>
+        <Row
+          title={t("voiceless.shortcuts.translate.title")}
+          description={t("voiceless.shortcuts.translate.description")}
+        >
+          <ShortcutField bindingId="translate" altBindingId="translate_alt" />
+        </Row>
+        <Row
+          title={t("voiceless.shortcuts.activation.title")}
+          description={t("voiceless.shortcuts.activation.description")}
+          stacked
+        >
+          <Segmented<ShortcutActivation>
+            value={settings?.shortcut_activation ?? "hold_or_toggle"}
+            onChange={(value) =>
+              void updateSetting("shortcut_activation", value)
+            }
+            options={[
+              {
+                value: "hold_or_toggle",
+                label: t("voiceless.shortcuts.activation.hold_or_toggle"),
+              },
+              {
+                value: "toggle",
+                label: t("voiceless.shortcuts.activation.toggle"),
+              },
+              {
+                value: "push_to_talk",
+                label: t("voiceless.shortcuts.activation.push_to_talk"),
+              },
+            ]}
+          />
+        </Row>
+      </Section>
+      <div className="text-[13px] text-mid-gray leading-relaxed flex flex-col gap-1.5">
+        <p>{t("voiceless.shortcuts.tips")}</p>
+        {anyFn && <p>{t("voiceless.shortcuts.fnHardware")}</p>}
+      </div>
+    </Page>
+  );
+};

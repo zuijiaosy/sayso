@@ -1,6 +1,6 @@
 {
   "tray": {
-    "settings": "设置...",
+    "settings": "设置…",
     "checkUpdates": "检查更新...",
     "copyLastTranscript": "复制最新转录",
     "unloadModel": "卸载模型",
@@ -726,5 +726,212 @@
     "learnMore": "如何解决",
     "recorderBlocked": "当前无法录制快捷键——macOS 的 Secure Input 正在阻止按键事件。请先解决 Secure Input 警告。",
     "dismiss": "关闭"
+  },
+  "voiceless": {
+    "appName": "Voiceless",
+    "nav": {
+      "shortcuts": "快捷键",
+      "models": "模型",
+      "dictionary": "词典",
+      "general": "通用",
+      "permissions": "权限"
+    },
+    "common": {
+      "save": "保存",
+      "saved": "已保存",
+      "cancel": "取消",
+      "delete": "删除",
+      "test": "测试",
+      "testing": "测试中…",
+      "loading": "加载中…",
+      "recheck": "重新检查",
+      "openSystemSettings": "打开系统设置",
+      "notSet": "未设置"
+    },
+    "shortcuts": {
+      "title": "键盘快捷键",
+      "dictate": {
+        "title": "语音输入",
+        "description": "按下开始和停止语音输入。"
+      },
+      "translate": {
+        "title": "翻译",
+        "description": "按下开始和停止翻译。"
+      },
+      "addAnother": "添加另一个",
+      "pressKeys": "请按下快捷键…",
+      "remove": "移除",
+      "reset": "恢复默认",
+      "activation": {
+        "title": "触发方式",
+        "description": "短按一次开始、再按一次结束；或按住说话、松开结束。",
+        "hold_or_toggle": "短按切换 + 按住说话",
+        "toggle": "仅短按切换",
+        "push_to_talk": "仅按住说话"
+      },
+      "tips": "录音时：按 Esc 或点 ✕ 取消，点 ✓ 结束。先按住 Fn 再按左 Shift，会把正在进行的口述切换为翻译。",
+      "fnHardware": "Fn 键只在 Apple 键盘上有效。使用第三方键盘时，请添加另一个快捷键。",
+      "fnWarning": {
+        "title": "Fn 键与系统设置冲突",
+        "body": "系统设置 → 键盘 →「按下 🌐 键时」目前是「{{action}}」。请改为「不执行任何操作」，否则按 Fn 会同时触发系统功能。",
+        "open": "打开键盘设置"
+      },
+      "fnActions": {
+        "do_nothing": "不执行任何操作",
+        "change_input_source": "更改输入法",
+        "emoji": "显示表情与符号",
+        "dictation": "开始听写",
+        "unknown": "未知"
+      },
+      "errors": {
+        "set": "无法设置快捷键：{{error}}",
+        "clear": "无法移除快捷键：{{error}}"
+      }
+    },
+    "models": {
+      "title": "模型",
+      "asr": {
+        "title": "语音识别",
+        "description": "把声音转成文字。",
+        "local": "本地识别",
+        "localDesc": "离线运行，音频不会离开这台 Mac。",
+        "cloud": "阿里云百炼",
+        "cloudDesc": "音频会上传到阿里云 Qwen-ASR 识别。"
+      },
+      "local": {
+        "title": "本地模型",
+        "chineseOnly": "仅显示支持中文的模型",
+        "recommended": "推荐",
+        "download": "下载",
+        "cancel": "取消下载",
+        "use": "使用",
+        "inUse": "使用中",
+        "delete": "删除",
+        "downloading": "下载中 {{percent}}%",
+        "verifying": "校验中…",
+        "extracting": "解压中…",
+        "size": "{{size}} MB",
+        "import": "导入已有模型文件夹",
+        "importDesc": "选择包含 model.int8.onnx 和 tokens.txt 的 SenseVoice 文件夹，不会重新下载。",
+        "importOk": "SenseVoice 模型已导入并启用",
+        "importFailed": "导入失败：{{error}}",
+        "empty": "还没有可用的本地模型"
+      },
+      "cloud": {
+        "title": "阿里云百炼 Qwen-ASR",
+        "endpoint": "服务地址",
+        "endpointDesc": "默认 https://dashscope.aliyuncs.com。使用业务空间时，填写控制台给出的地址。",
+        "apiKey": "API Key",
+        "apiKeyDesc": "留空时使用下方「阿里云百炼」文本模型的 Key。",
+        "model": "模型",
+        "language": "识别语言",
+        "languageAuto": "自动检测",
+        "sendDictionary": "把词典作为识别上下文",
+        "sendDictionaryDesc": "词典中的标准写法会随音频一起发送。",
+        "testOk": "连接成功（{{ms}} 毫秒）",
+        "testFailed": "连接失败：{{error}}",
+        "saveFailed": "保存失败：{{error}}"
+      },
+      "text": {
+        "title": "文本模型",
+        "description": "用于整理口述和翻译。启用后，识别出的文字会发送到所选服务。",
+        "provider": "服务商",
+        "baseUrl": "Base URL",
+        "apiKey": "API Key",
+        "model": "模型",
+        "fetchModels": "获取模型列表",
+        "testOk": "文本模型可用",
+        "testFailed": "文本模型不可用：{{error}}",
+        "notConfigured": "还没有配置文本模型：口述会直接插入识别结果，翻译不可用。",
+        "mode": {
+          "title": "口述整理",
+          "off": "关闭",
+          "fix": "仅纠错",
+          "polish": "整理",
+          "offDesc": "直接插入识别结果（仍会应用词典替换）。",
+          "fixDesc": "只修正错字、断句和标点。",
+          "polishDesc": "去掉口头语、理顺表达，不改变意思。"
+        }
+      }
+    },
+    "dictionary": {
+      "title": "词典",
+      "description": "专有名词和常见误识别。识别后按字面替换，并提示给文本模型；翻译时使用固定译法。",
+      "term": "标准写法",
+      "aliases": "常见误识别",
+      "aliasesPlaceholder": "用逗号分隔",
+      "translation": "固定译法",
+      "note": "备注",
+      "add": "添加词条",
+      "empty": "还没有词条。添加你常说的产品名、人名或术语。",
+      "search": "搜索词条",
+      "import": "导入",
+      "export": "复制为文本",
+      "copied": "已复制到剪贴板",
+      "importTitle": "导入词典",
+      "importPlaceholder": "每行一条：\n标准写法 | 误识别1, 误识别2 | 固定译法 | 备注\n或：误识别 → 标准写法",
+      "importMerge": "合并导入",
+      "importReplace": "替换全部",
+      "imported": "已导入 {{count}} 个词条"
+    },
+    "general": {
+      "title": "通用",
+      "autostart": "开机启动",
+      "autostartDesc": "登录后在菜单栏运行 Voiceless。",
+      "targetLanguage": "默认翻译语言",
+      "targetLanguageDesc": "录音时也可以在悬浮条上临时切换。",
+      "appLanguage": "界面语言",
+      "microphone": "麦克风",
+      "microphoneDesc": "用于语音输入的输入设备。",
+      "overlayPosition": "悬浮条位置",
+      "overlayTop": "屏幕顶部",
+      "overlayBottom": "屏幕底部",
+      "clipboard": "保留结果在剪贴板",
+      "clipboardDesc": "插入文字后，把结果也留在剪贴板中。",
+      "about": "关于",
+      "version": "版本 {{version}}",
+      "basedOn": "基于开源项目 Handy（MIT）。",
+      "openLogs": "打开日志文件夹",
+      "quit": "退出 Voiceless"
+    },
+    "permissions": {
+      "title": "权限",
+      "description": "Voiceless 需要以下权限才能在任意应用中输入文字。",
+      "microphone": {
+        "title": "麦克风",
+        "description": "录制你的声音。"
+      },
+      "accessibility": {
+        "title": "辅助功能",
+        "description": "把文字粘贴到当前输入框。"
+      },
+      "inputMonitoring": {
+        "title": "输入监控",
+        "description": "识别 Fn 等全局快捷键。"
+      },
+      "granted": "已授权",
+      "grant": "授权",
+      "restartHint": "授权后如果快捷键仍无反应，请退出并重新打开 Voiceless。",
+      "fn": {
+        "title": "Fn 键行为",
+        "ok": "已设为「不执行任何操作」",
+        "bad": "当前为「{{action}}」，建议改为「不执行任何操作」"
+      }
+    },
+    "onboarding": {
+      "welcome": "欢迎使用 Voiceless",
+      "subtitle": "按下 Fn 说话，整理好的文字出现在光标处。",
+      "stepPermissions": "第 1 步：授予权限",
+      "stepModel": "第 2 步：选择语音识别",
+      "continue": "继续",
+      "back": "返回",
+      "download": "下载 SenseVoice",
+      "downloadDesc": "约 152 MB。离线识别中文、英文、日语、韩语和粤语。",
+      "import": "使用已有的模型文件夹",
+      "importDesc": "已有 sherpa-onnx SenseVoice int8 模型时，无需重新下载。",
+      "cloud": "使用阿里云百炼",
+      "cloudDesc": "音频上传识别。稍后在「模型」中填写 API Key。",
+      "finishing": "正在启用模型…"
+    }
   }
 }

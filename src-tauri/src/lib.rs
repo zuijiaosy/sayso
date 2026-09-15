@@ -739,6 +739,7 @@ pub fn run(cli_args: CliArgs) {
             commands::voice::export_dictionary_text,
             commands::voice::import_sense_voice_model,
             commands::voice::complete_onboarding,
+            commands::voice::test_text_model,
             commands::voice::update_dictation_post_mode,
             commands::voice::update_dictionary,
             commands::get_app_dir_path,
@@ -799,13 +800,17 @@ pub fn run(cli_args: CliArgs) {
             voice::TranslationFailedEvent,
         ]);
 
-    #[cfg(debug_assertions)] // <- Only export on non-release builds
-    specta_builder
-        .export(
+    // Only export on non-release builds, and only when running from the source
+    // tree: a debug .app launched from /Applications has no ../src to write to.
+    #[cfg(debug_assertions)]
+    if std::path::Path::new("../src").is_dir() {
+        if let Err(e) = specta_builder.export(
             Typescript::default().bigint(BigIntExportBehavior::Number),
             "../src/bindings.ts",
-        )
-        .expect("Failed to export typescript bindings");
+        ) {
+            eprintln!("Failed to export typescript bindings: {e:?}");
+        }
+    }
 
     let invoke_handler = specta_builder.invoke_handler();
 

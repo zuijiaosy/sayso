@@ -400,6 +400,24 @@ pub async fn import_sense_voice_model(app: AppHandle, path: String) -> Result<()
     .map_err(|e| e.to_string())?
 }
 
+/// Send a tiny request through the configured text model. Returns the reply.
+#[tauri::command]
+#[specta::specta]
+pub async fn test_text_model(app: AppHandle) -> Result<String, String> {
+    let settings = get_settings(&app);
+    run_text_model(
+        &settings,
+        "You are a connectivity check. Reply with exactly: OK",
+        "ping",
+    )
+    .await
+    .map_err(|e| match e {
+        crate::actions::TextModelError::NotConfigured(why) => format!("not configured: {why}"),
+        crate::actions::TextModelError::Request(why) => why,
+        crate::actions::TextModelError::InvalidOutput(why) => format!("invalid reply: {why}"),
+    })
+}
+
 /// Finish first-run setup without a local model (cloud recognition).
 #[tauri::command]
 #[specta::specta]

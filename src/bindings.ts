@@ -682,6 +682,17 @@ async importSenseVoiceModel(path: string) : Promise<Result<null, string>> {
 async completeOnboarding() : Promise<void> {
     await TAURI_INVOKE("complete_onboarding");
 },
+/**
+ * Send a tiny request through the configured text model. Returns the reply.
+ */
+async testTextModel() : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("test_text_model") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async updateDictationPostMode(mode: DictationPostMode) : Promise<void> {
     await TAURI_INVOKE("update_dictation_post_mode", { mode });
 },

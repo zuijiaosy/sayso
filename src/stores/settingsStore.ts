@@ -3,7 +3,11 @@ import { subscribeWithSelector } from "zustand/middleware";
 import { listen } from "@tauri-apps/api/event";
 import type {
   AppSettings as Settings,
+  AsrProviderKind,
   AudioDevice,
+  DashScopeAsrSettings,
+  DictationPostMode,
+  DictionaryEntry,
   TranscribeAcceleratorSetting,
   OrtAcceleratorSetting,
   ShortcutActivation,
@@ -194,6 +198,24 @@ const settingUpdaters: {
     commands.changeTranscribeGpuDevice(value as string | null),
   extra_recording_buffer_ms: (value) =>
     commands.changeExtraRecordingBufferSetting(value as number),
+  // Voiceless
+  dictation_post_mode: (value) =>
+    commands.updateDictationPostMode(value as DictationPostMode),
+  translate_target_language: async (value) => {
+    const result = await commands.setSessionTranslateTarget(value as string);
+    if (result.status === "error") throw new Error(result.error);
+  },
+  asr_provider: (value) => commands.updateAsrProvider(value as AsrProviderKind),
+  dashscope_asr: async (value) => {
+    const result = await commands.updateDashscopeAsrSettings(
+      value as DashScopeAsrSettings,
+    );
+    if (result.status === "error") {
+      toast.error(result.error);
+      throw new Error(result.error);
+    }
+  },
+  dictionary: (value) => commands.updateDictionary(value as DictionaryEntry[]),
 };
 
 export const useSettingsStore = create<SettingsStore>()(
