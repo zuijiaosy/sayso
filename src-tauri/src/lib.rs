@@ -1,6 +1,7 @@
 mod actions;
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 mod apple_intelligence;
+mod asr;
 mod audio_feedback;
 pub mod audio_toolkit;
 mod autostart;
@@ -730,6 +731,12 @@ pub fn run(cli_args: CliArgs) {
             commands::voice::copy_failed_translation_source,
             commands::voice::dismiss_translation_failure,
             commands::voice::set_overlay_picker_open,
+            commands::voice::update_asr_provider,
+            commands::voice::update_dashscope_asr_settings,
+            commands::voice::set_asr_api_key,
+            commands::voice::test_dashscope_asr,
+            commands::voice::import_dictionary_text,
+            commands::voice::export_dictionary_text,
             commands::voice::update_dictation_post_mode,
             commands::voice::update_dictionary,
             commands::get_app_dir_path,

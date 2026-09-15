@@ -623,6 +623,46 @@ async dismissTranslationFailure() : Promise<void> {
 async setOverlayPickerOpen(open: boolean) : Promise<void> {
     await TAURI_INVOKE("set_overlay_picker_open", { open });
 },
+async updateAsrProvider(provider: AsrProviderKind) : Promise<void> {
+    await TAURI_INVOKE("update_asr_provider", { provider });
+},
+async updateDashscopeAsrSettings(config: DashScopeAsrSettings) : Promise<Result<DashScopeAsrSettings, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_dashscope_asr_settings", { config }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setAsrApiKey(provider: string, apiKey: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_asr_api_key", { provider, apiKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Check the DashScope key and endpoint with one second of silence.
+ * Returns the latency in milliseconds.
+ */
+async testDashscopeAsr() : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("test_dashscope_asr") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Merge imported text into the dictionary (or replace it) and save.
+ */
+async importDictionaryText(text: string, replace: boolean) : Promise<DictionaryEntry[]> {
+    return await TAURI_INVOKE("import_dictionary_text", { text, replace });
+},
+async exportDictionaryText() : Promise<string> {
+    return await TAURI_INVOKE("export_dictionary_text");
+},
 async updateDictationPostMode(mode: DictationPostMode) : Promise<void> {
     await TAURI_INVOKE("update_dictation_post_mode", { mode });
 },
@@ -1117,13 +1157,51 @@ translate_target_language?: string;
 /**
  * Voiceless: custom dictionary.
  */
-dictionary?: DictionaryEntry[] }
+dictionary?: DictionaryEntry[]; 
+/**
+ * Voiceless: speech recognition engine.
+ */
+asr_provider?: AsrProviderKind; dashscope_asr?: DashScopeAsrSettings; 
+/**
+ * API keys for cloud ASR providers, keyed by provider id.
+ */
+asr_api_keys?: SecretMap }
+/**
+ * Which engine turns speech into text.
+ */
+export type AsrProviderKind = 
+/**
+ * On-device model (default; audio never leaves the Mac).
+ */
+"local" | 
+/**
+ * Alibaba Cloud Model Studio Qwen-ASR (audio is uploaded).
+ */
+"dashscope"
 export type AudioDevice = { index: string; name: string; is_default: boolean }
 export type AutoSubmitKey = "enter" | "ctrl_enter" | "cmd_enter"
 export type AvailableAccelerators = { transcribe: string[]; ort: string[]; gpu_devices: GpuDeviceOption[] }
 export type BindingResponse = { success: boolean; binding: ShortcutBinding | null; error: string | null }
 export type ClipboardHandling = "dont_modify" | "copy_to_clipboard"
 export type CustomSounds = { start: boolean; stop: boolean }
+/**
+ * Settings for the DashScope Qwen-ASR provider. The API key is stored in
+ * `asr_api_keys["dashscope"]`.
+ */
+export type DashScopeAsrSettings = { 
+/**
+ * Base URL, e.g. `https://dashscope.aliyuncs.com` or a workspace host
+ * such as `https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com`.
+ */
+endpoint: string; model: string; 
+/**
+ * Language code (`zh`, `en`, ...) or `auto`.
+ */
+language: string; 
+/**
+ * Send dictionary terms as recognition context.
+ */
+send_dictionary: boolean }
 /**
  * What the text model does to a dictation (translation always uses the model).
  */

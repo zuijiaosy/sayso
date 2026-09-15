@@ -261,6 +261,43 @@ pub enum DictationPostMode {
     Polish,
 }
 
+/// Which engine turns speech into text.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AsrProviderKind {
+    /// On-device model (default; audio never leaves the Mac).
+    #[default]
+    Local,
+    /// Alibaba Cloud Model Studio Qwen-ASR (audio is uploaded).
+    Dashscope,
+}
+
+/// Settings for the DashScope Qwen-ASR provider. The API key is stored in
+/// `asr_api_keys["dashscope"]`.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Type)]
+#[serde(default)]
+pub struct DashScopeAsrSettings {
+    /// Base URL, e.g. `https://dashscope.aliyuncs.com` or a workspace host
+    /// such as `https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com`.
+    pub endpoint: String,
+    pub model: String,
+    /// Language code (`zh`, `en`, ...) or `auto`.
+    pub language: String,
+    /// Send dictionary terms as recognition context.
+    pub send_dictionary: bool,
+}
+
+impl Default for DashScopeAsrSettings {
+    fn default() -> Self {
+        Self {
+            endpoint: crate::asr::dashscope::DEFAULT_ENDPOINT.to_string(),
+            model: crate::asr::dashscope::DEFAULT_MODEL.to_string(),
+            language: "auto".to_string(),
+            send_dictionary: true,
+        }
+    }
+}
+
 /// One custom dictionary entry.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Type, Default)]
 pub struct DictionaryEntry {
@@ -354,7 +391,7 @@ pub enum VadBackend {
     Earshot,
 }
 
-#[derive(Clone, Serialize, Deserialize, Type)]
+#[derive(Clone, Serialize, Deserialize, Type, Default)]
 #[serde(transparent)]
 pub(crate) struct SecretMap(HashMap<String, String>);
 
@@ -552,6 +589,14 @@ pub struct AppSettings {
     /// Voiceless: custom dictionary.
     #[serde(default)]
     pub dictionary: Vec<DictionaryEntry>,
+    /// Voiceless: speech recognition engine.
+    #[serde(default)]
+    pub asr_provider: AsrProviderKind,
+    #[serde(default)]
+    pub dashscope_asr: DashScopeAsrSettings,
+    /// API keys for cloud ASR providers, keyed by provider id.
+    #[serde(default)]
+    pub asr_api_keys: SecretMap,
 }
 
 fn default_translate_target_language() -> String {
@@ -1047,6 +1092,9 @@ pub fn get_default_settings() -> AppSettings {
         dictation_post_mode: DictationPostMode::default(),
         translate_target_language: default_translate_target_language(),
         dictionary: Vec::new(),
+        asr_provider: AsrProviderKind::default(),
+        dashscope_asr: DashScopeAsrSettings::default(),
+        asr_api_keys: SecretMap::default(),
     }
 }
 

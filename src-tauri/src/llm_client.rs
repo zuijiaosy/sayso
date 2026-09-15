@@ -713,6 +713,35 @@ mod tests {
         assert_eq!(json["thinking"]["type"], "disabled");
     }
 
+    /// Live check that the DeepSeek preset URL resolves to the chat endpoint
+    /// (an invalid key must yield 401, not 404). Run with
+    /// `VOICELESS_LIVE_TESTS=1 cargo test --lib live_deepseek -- --ignored`.
+    #[test]
+    #[ignore]
+    fn live_deepseek_preset_reaches_chat_endpoint() {
+        if std::env::var("VOICELESS_LIVE_TESTS").ok().as_deref() != Some("1") {
+            return;
+        }
+        let provider = crate::settings::get_default_settings()
+            .post_process_provider(crate::settings::DEEPSEEK_PROVIDER_ID)
+            .cloned()
+            .unwrap();
+        let result = tauri::async_runtime::block_on(send_chat_completion_with_schema(
+            &provider,
+            "sk-voiceless-invalid-key".into(),
+            "deepseek-flash",
+            "ping".into(),
+            Some("reply with pong".into()),
+            None,
+            true,
+        ));
+        let err = result.expect_err("an invalid key must fail");
+        assert!(
+            err.contains("401"),
+            "expected 401 from the chat endpoint, got: {err}"
+        );
+    }
+
     #[test]
     fn deepseek_provider_disables_thinking_and_sends_no_other_fields() {
         let params = reasoning_disable_params(&provider("deepseek", "https://api.deepseek.com"));

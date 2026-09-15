@@ -1,7 +1,10 @@
 //! Commands for Voiceless dictate / translate sessions.
 
 use crate::actions::{paste_and_finish, run_text_model, show_translation_failure};
-use crate::settings::{get_settings, write_settings, DictationPostMode, DictionaryEntry};
+use crate::settings::{
+    get_settings, write_settings, AsrProviderKind, DashScopeAsrSettings, DictationPostMode,
+    DictionaryEntry,
+};
 use crate::tray::{set_tray_state, TrayIconState};
 use crate::utils;
 use crate::voice::{
@@ -165,6 +168,167 @@ pub fn update_dictionary(app: AppHandle, entries: Vec<DictionaryEntry>) -> Vec<D
     cleaned
 }
 
+#[tauri::command]
+#[specta::specta]
+pub fn update_asr_provider(app: AppHandle, provider: AsrProviderKind) {
+    let mut settings = get_settings(&app);
+    settings.asr_provider = provider;
+    write_settings(&app, settings);
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn update_dashscope_asr_settings(
+    app: AppHandle,
+    config: DashScopeAsrSettings,
+) -> Result<DashScopeAsrSettings, String> {
+    let endpoint = config.endpoint.trim().trim_end_matches('/').to_string();
+    if !(endpoint.starts_with("https://") || endpoint.starts_with("http://")) {
+        return Err("Endpoint must start with https://".to_string());
+    }
+    let model = config.model.trim().to_string();
+    if model.is_empty() {
+        return Err("Model cannot be empty".to_string());
+    }
+    let language = match config.language.trim() {
+        "" => "auto".to_string(),
+        other => other.to_string(),
+    };
+    let cleaned = DashScopeAsrSettings {
+        endpoint,
+        model,
+        language,
+        send_dictionary: config.send_dictionary,
+    };
+    let mut settings = get_settings(&app);
+    settings.dashscope_asr = cleaned.clone();
+    write_settings(&app, settings);
+    Ok(cleaned)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_asr_api_key(app: AppHandle, provider: String, api_key: String) -> Result<(), String> {
+    if provider != crate::asr::dashscope::PROVIDER_ID {
+        return Err(format!("Unknown ASR provider: {provider}"));
+    }
+    let mut settings = get_settings(&app);
+    settings
+        .asr_api_keys
+        .insert(provider, api_key.trim().to_string());
+    write_settings(&app, settings);
+    Ok(())
+}
+
+/// Check the DashScope key and endpoint with one second of silence.
+/// Returns the latency in milliseconds.
+#[tauri::command]
+#[specta::specta]
+pub async fn test_dashscope_asr(app: AppHandle) -> Result<u32, String> {
+    let settings = get_settings(&app);
+    let request = crate::asr::dashscope_request(&settings);
+    let started = std::time::Instant::now();
+    let silence = vec![0.0f32; crate::asr::SAMPLE_RATE as usize];
+    crate::asr::dashscope::transcribe(&request, &silence)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(started.elapsed().as_millis().min(u32::MAX as u128) as u32)
+}
+
+/// Parse dictionary text. One entry per line, `#` starts a comment:
+/// `term | alias, alias | translation | note`, or `wrong → right` / `wrong -> right`,
+/// or just `term`.
+pub fn parse_dictionary_text(text: &str) -> Vec<DictionaryEntry> {
+    let mut entries = Vec::new();
+    for raw in text.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if line.contains('|') {
+            let mut fields = line.split('|').map(str::trim);
+            let term = fields.next().unwrap_or_default().to_string();
+            let aliases = fields
+                .next()
+                .unwrap_or_default()
+                .split([',', '，', '、'])
+                .map(|a| a.trim().to_string())
+                .filter(|a| !a.is_empty())
+                .collect();
+            let translation = fields.next().map(str::to_string);
+            let note = fields.next().map(str::to_string);
+            entries.push(DictionaryEntry {
+                term,
+                aliases,
+                translation,
+                note,
+            });
+            continue;
+        }
+        let arrow = ["→", "->", "=>"]
+            .iter()
+            .find_map(|sep| line.split_once(sep));
+        if let Some((wrong, right)) = arrow {
+            entries.push(DictionaryEntry {
+                term: right.trim().to_string(),
+                aliases: vec![wrong.trim().to_string()],
+                translation: None,
+                note: None,
+            });
+            continue;
+        }
+        entries.push(DictionaryEntry {
+            term: line.to_string(),
+            ..Default::default()
+        });
+    }
+    normalize_dictionary(entries)
+}
+
+pub fn format_dictionary_text(entries: &[DictionaryEntry]) -> String {
+    let mut out = String::from("# Voiceless dictionary: term | aliases | translation | note\n");
+    for e in entries {
+        let fields = [
+            e.term.clone(),
+            e.aliases.join(", "),
+            e.translation.clone().unwrap_or_default(),
+            e.note.clone().unwrap_or_default(),
+        ];
+        let mut line = fields.join(" | ");
+        while line.ends_with(" | ") {
+            line.truncate(line.len() - 3);
+        }
+        out.push_str(&line);
+        out.push('\n');
+    }
+    out
+}
+
+/// Merge imported text into the dictionary (or replace it) and save.
+#[tauri::command]
+#[specta::specta]
+pub fn import_dictionary_text(app: AppHandle, text: String, replace: bool) -> Vec<DictionaryEntry> {
+    let imported = parse_dictionary_text(&text);
+    let mut settings = get_settings(&app);
+    let combined = if replace {
+        imported
+    } else {
+        let mut all = settings.dictionary.clone();
+        all.extend(imported);
+        all
+    };
+    let cleaned = normalize_dictionary(combined);
+    settings.dictionary = cleaned.clone();
+    write_settings(&app, settings);
+    cleaned
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn export_dictionary_text(app: AppHandle) -> String {
+    format_dictionary_text(&get_settings(&app).dictionary)
+}
+
 fn trimmed_opt(value: Option<String>) -> Option<String> {
     value
         .map(|v| v.trim().to_string())
@@ -214,6 +378,34 @@ pub fn normalize_dictionary(entries: Vec<DictionaryEntry>) -> Vec<DictionaryEntr
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_all_line_formats() {
+        let text = "# comment\nCodex | 扣戴克斯, code x | Codex | OpenAI 编程工具\n\n地表水 | | surface water\nnew api → new-api\n瑞迪斯 -> Redis\nClaude Code\n";
+        let entries = parse_dictionary_text(text);
+        assert_eq!(entries.len(), 5);
+        assert_eq!(entries[0].term, "Codex");
+        assert_eq!(entries[0].aliases, vec!["扣戴克斯", "code x"]);
+        assert_eq!(entries[0].note.as_deref(), Some("OpenAI 编程工具"));
+        assert_eq!(entries[1].term, "地表水");
+        assert!(entries[1].aliases.is_empty());
+        assert_eq!(entries[1].translation.as_deref(), Some("surface water"));
+        assert_eq!(entries[2].term, "new-api");
+        assert_eq!(entries[2].aliases, vec!["new api"]);
+        assert_eq!(entries[3].term, "Redis");
+        assert_eq!(entries[4].term, "Claude Code");
+    }
+
+    #[test]
+    fn export_round_trips() {
+        let entries = parse_dictionary_text(
+            "Codex | 扣戴克斯 | Codex | tool\n地表水 | | surface water\nPlain\n",
+        );
+        let text = format_dictionary_text(&entries);
+        assert!(text.contains("Plain\n"), "{text}");
+        assert!(text.contains("地表水 |  | surface water\n"), "{text}");
+        assert_eq!(parse_dictionary_text(&text), entries);
+    }
 
     #[test]
     fn normalizes_and_merges_entries() {
