@@ -186,6 +186,16 @@ pub fn initialize_shortcuts(app: AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
+    // The macOS key listener needs Accessibility. Starting without it fails,
+    // and a failed start must not be recorded as initialized, or shortcuts
+    // would stay dead after the user grants the permission.
+    #[cfg(target_os = "macos")]
+    if !tauri::async_runtime::block_on(
+        tauri_plugin_macos_permissions::check_accessibility_permission(),
+    ) {
+        return Err("accessibility-not-granted".to_string());
+    }
+
     // Initialize shortcuts
     crate::shortcut::init_shortcuts(&app);
 

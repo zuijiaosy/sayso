@@ -64,12 +64,22 @@ function App() {
   useEffect(() => {
     if (phase !== "ready" || initialized.current) return;
     initialized.current = true;
-    Promise.all([
-      commands.initializeEnigo(),
-      commands.initializeShortcuts(),
-    ]).catch((e) => console.warn("Failed to initialize:", e));
     void refreshAudioDevices();
     void refreshOutputDevices();
+    const init = async () => {
+      // Without Accessibility the key listener cannot start, and a failed
+      // start is still marked initialized. Wait for the grant instead; the
+      // Permissions page initializes as soon as it sees it.
+      if (platform() === "macos") {
+        const trusted = await checkAccessibilityPermission().catch(() => false);
+        if (!trusted) return;
+      }
+      await Promise.all([
+        commands.initializeEnigo(),
+        commands.initializeShortcuts(),
+      ]).catch((e) => console.warn("Failed to initialize:", e));
+    };
+    void init();
   }, [phase, refreshAudioDevices, refreshOutputDevices]);
 
   useEffect(() => {
