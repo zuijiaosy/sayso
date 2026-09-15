@@ -80,7 +80,6 @@ export const GeneralPage: React.FC = () => {
           description={t("voiceless.general.microphoneDesc")}
         >
           <SelectInput
-            className="max-w-56"
             value={settings.selected_microphone ?? "Default"}
             onChange={(e) =>
               void updateSetting("selected_microphone", e.target.value)
@@ -151,7 +150,7 @@ export const GeneralPage: React.FC = () => {
             </>
           }
         >
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button
               variant="secondary"
               size="sm"

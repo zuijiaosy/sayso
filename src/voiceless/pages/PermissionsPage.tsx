@@ -96,7 +96,7 @@ export const PermissionRows: React.FC<{ state: PermissionState }> = ({
             {granted ? (
               <StatusPill ok>{t("voiceless.permissions.granted")}</StatusPill>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap justify-end gap-2">
                 <Button
                   variant="primary"
                   size="sm"
@@ -158,7 +158,7 @@ export const PermissionsPage: React.FC = () => {
               {t("voiceless.shortcuts.fnActions.do_nothing")}
             </StatusPill>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button
                 variant="secondary"
                 size="sm"
@@ -173,7 +173,7 @@ export const PermissionsPage: React.FC = () => {
           )}
         </Row>
       </Section>
-      <p className="text-[13px] text-mid-gray">
+      <p className="text-[13px] text-mid-gray leading-relaxed">
         {t("voiceless.permissions.restartHint")}
       </p>
     </Page>

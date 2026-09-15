@@ -163,10 +163,10 @@ const ModelRow: React.FC<{ model: ModelInfo }> = ({ model }) => {
   return (
     <Row
       title={
-        <span className="flex items-center gap-2">
-          {model.name}
+        <span className="flex items-center gap-2 min-w-0">
+          <span className="truncate">{model.name}</span>
           {model.id === SENSE_VOICE_ID && (
-            <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-background-ui/15 text-background-ui">
+            <span className="shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded bg-background-ui/15 text-background-ui">
               {t("voiceless.models.local.recommended")}
             </span>
           )}
@@ -201,38 +201,42 @@ const LocalModels: React.FC = () => {
       {visible.map((model) => (
         <ModelRow key={model.id} model={model} />
       ))}
-      <div className="py-3 flex flex-wrap items-center gap-2">
-        {models.length > 5 && (
+      <div className="py-3 flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {models.length > 5 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? "−" : `+${models.length - 5}`}
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void importSenseVoiceFolder(t)}
+          >
+            <FolderOpen size={14} />
+            {t("voiceless.models.local.import")}
+          </Button>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setExpanded(!expanded)}
+            disabled={isRescanning}
+            onClick={() => void rescanLocalModels()}
+            aria-label="rescan"
           >
-            {expanded ? "−" : `+${models.length - 5}`}
+            <RefreshCw
+              size={14}
+              className={isRescanning ? "animate-spin" : ""}
+            />
           </Button>
-        )}
-        <Button
-          variant="secondary"
-          size="sm"
-          className="inline-flex items-center gap-1.5"
-          onClick={() => void importSenseVoiceFolder(t)}
-        >
-          <FolderOpen size={14} />
-          {t("voiceless.models.local.import")}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={isRescanning}
-          onClick={() => void rescanLocalModels()}
-          aria-label="rescan"
-        >
-          <RefreshCw size={14} className={isRescanning ? "animate-spin" : ""} />
-        </Button>
+        </div>
+        <p className="text-xs text-mid-gray leading-relaxed">
+          {t("voiceless.models.local.importDesc")}
+        </p>
       </div>
-      <p className="text-xs text-mid-gray pb-2">
-        {t("voiceless.models.local.importDesc")}
-      </p>
     </>
   );
 };
@@ -342,7 +346,7 @@ const DashscopeForm: React.FC = () => {
       />
       <Row title={t("voiceless.models.cloud.model")}>
         <TextInput
-          className="w-56"
+          className="w-56 max-w-full"
           value={draft.model}
           spellCheck={false}
           onChange={(e) => setDraft({ ...draft, model: e.target.value })}
@@ -414,7 +418,7 @@ const GlmForm: React.FC = () => {
       />
       <Row title={t("voiceless.models.cloud.model")}>
         <TextInput
-          className="w-56"
+          className="w-56 max-w-full"
           value={draft.model}
           spellCheck={false}
           onChange={(e) => setDraft({ ...draft, model: e.target.value })}
@@ -604,9 +608,9 @@ const TextModelSection: React.FC = () => {
         </>
       )}
       <Row title={t("voiceless.models.text.model")}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <TextInput
-            className="w-56"
+            className="w-56 max-w-full"
             list={`models-${providerId}`}
             value={model}
             spellCheck={false}
@@ -625,6 +629,7 @@ const TextModelSection: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
+              className="shrink-0"
               title={t("voiceless.models.text.fetchModels")}
               aria-label={t("voiceless.models.text.fetchModels")}
               onClick={() => void fetchPostProcessModels(providerId)}

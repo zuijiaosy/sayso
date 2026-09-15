@@ -18,6 +18,15 @@ interface DraftEntry {
 
 let nextKey = 1;
 
+const Field: React.FC<
+  { label: string } & React.InputHTMLAttributes<HTMLInputElement>
+> = ({ label, ...inputProps }) => (
+  <label className="flex flex-col gap-1 min-w-0">
+    <span className="text-[11px] leading-4 text-mid-gray">{label}</span>
+    <TextInput className="w-full" {...inputProps} />
+  </label>
+);
+
 const toDraft = (entry: DictionaryEntry): DraftEntry => ({
   key: nextKey++,
   term: entry.term,
@@ -130,7 +139,7 @@ export const DictionaryPage: React.FC = () => {
         icon={<BookOpen size={20} />}
         title={t("voiceless.dictionary.title")}
         actions={
-          <div className="flex items-center gap-2">
+          <>
             <Button
               variant="ghost"
               size="sm"
@@ -141,16 +150,11 @@ export const DictionaryPage: React.FC = () => {
             <Button variant="ghost" size="sm" onClick={() => void exportText()}>
               {t("voiceless.dictionary.export")}
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              className="inline-flex items-center gap-1"
-              onClick={add}
-            >
+            <Button variant="primary" size="sm" onClick={add}>
               <Plus size={14} />
               {t("voiceless.dictionary.add")}
             </Button>
-          </div>
+          </>
         }
       >
         {importOpen && (
@@ -159,13 +163,13 @@ export const DictionaryPage: React.FC = () => {
               {t("voiceless.dictionary.importTitle")}
             </div>
             <textarea
-              className="w-full min-h-32 p-3 text-sm font-mono rounded-lg border border-mid-gray/30 bg-background focus:outline-none focus:border-background-ui"
+              className="w-full min-w-0 min-h-32 p-3 text-sm font-mono rounded-lg border border-mid-gray/30 bg-background focus:outline-none focus:border-background-ui"
               placeholder={t("voiceless.dictionary.importPlaceholder")}
               value={importText}
               spellCheck={false}
               onChange={(e) => setImportText(e.target.value)}
             />
-            <div className="flex gap-2 justify-end">
+            <div className="flex flex-wrap gap-2 justify-end">
               <Button
                 variant="secondary"
                 size="sm"
@@ -212,61 +216,44 @@ export const DictionaryPage: React.FC = () => {
         {visible.map((draft) => (
           <div
             key={draft.key}
-            className="py-3 grid grid-cols-[1fr_1.4fr_1fr_auto] gap-2 items-start"
+            className="py-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 items-end"
           >
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] text-mid-gray">
-                {t("voiceless.dictionary.term")}
-              </span>
-              <TextInput
-                value={draft.term}
-                autoFocus={!draft.term}
-                spellCheck={false}
-                onChange={(e) => update(draft.key, { term: e.target.value })}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] text-mid-gray">
-                {t("voiceless.dictionary.aliases")}
-              </span>
-              <TextInput
-                value={draft.aliases}
-                placeholder={t("voiceless.dictionary.aliasesPlaceholder")}
-                spellCheck={false}
-                onChange={(e) => update(draft.key, { aliases: e.target.value })}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] text-mid-gray">
-                {t("voiceless.dictionary.translation")}
-              </span>
-              <TextInput
-                value={draft.translation}
-                spellCheck={false}
-                onChange={(e) =>
-                  update(draft.key, { translation: e.target.value })
-                }
-              />
-            </label>
+            <Field
+              label={t("voiceless.dictionary.term")}
+              value={draft.term}
+              autoFocus={!draft.term}
+              spellCheck={false}
+              onChange={(e) => update(draft.key, { term: e.target.value })}
+            />
+            <Field
+              label={t("voiceless.dictionary.aliases")}
+              value={draft.aliases}
+              placeholder={t("voiceless.dictionary.aliasesPlaceholder")}
+              spellCheck={false}
+              onChange={(e) => update(draft.key, { aliases: e.target.value })}
+            />
             <button
               type="button"
-              className="mt-6 p-2 rounded-md text-mid-gray hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
+              className="h-9 w-9 grid place-items-center rounded-lg text-mid-gray hover:text-error hover:bg-error/10 cursor-pointer"
               aria-label={t("voiceless.common.delete")}
               title={t("voiceless.common.delete")}
               onClick={() => remove(draft.key)}
             >
               <Trash2 size={16} />
             </button>
-            <label className="col-span-3 flex items-center gap-2">
-              <span className="text-[11px] text-mid-gray shrink-0">
-                {t("voiceless.dictionary.note")}
-              </span>
-              <TextInput
-                className="flex-1 h-8"
-                value={draft.note}
-                onChange={(e) => update(draft.key, { note: e.target.value })}
-              />
-            </label>
+            <Field
+              label={t("voiceless.dictionary.translation")}
+              value={draft.translation}
+              spellCheck={false}
+              onChange={(e) =>
+                update(draft.key, { translation: e.target.value })
+              }
+            />
+            <Field
+              label={t("voiceless.dictionary.note")}
+              value={draft.note}
+              onChange={(e) => update(draft.key, { note: e.target.value })}
+            />
           </div>
         ))}
       </Section>

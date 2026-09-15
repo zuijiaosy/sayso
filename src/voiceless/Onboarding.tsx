@@ -10,6 +10,7 @@ import type { PageId } from "./SettingsShell";
 import { importSenseVoiceFolder, SENSE_VOICE_ID } from "./pages/ModelsPage";
 import { PermissionRows, usePermissions } from "./pages/PermissionsPage";
 import { FnSettingNotice, useFnKeyUsage } from "./pages/ShortcutsPage";
+import { Section } from "./ui";
 
 const Choice: React.FC<{
   icon: React.ReactNode;
@@ -30,12 +31,20 @@ const Choice: React.FC<{
     </span>
     <span className="flex-1 min-w-0">
       <span className="block text-[15px] font-semibold">{title}</span>
-      <span className="block text-[13px] text-mid-gray mt-0.5">
+      <span className="block text-[13px] text-mid-gray mt-0.5 leading-relaxed">
         {description}
       </span>
     </span>
-    {trailing}
+    {trailing && <span className="shrink-0">{trailing}</span>}
   </button>
+);
+
+const Frame: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="h-screen overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] bg-background text-text select-none">
+    <div className="w-full max-w-[560px] mx-auto px-8 pt-10 pb-12">
+      {children}
+    </div>
+  </div>
 );
 
 export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
@@ -96,111 +105,107 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
 
   if (step === "permissions") {
     return (
-      <div className="h-screen overflow-y-auto bg-background text-text select-none">
-        <div className="max-w-[560px] mx-auto px-8 pt-14 pb-10">
-          <h1 className="text-[28px] font-bold tracking-tight">
-            {t("voiceless.onboarding.welcome")}
-          </h1>
-          <p className="text-sm text-mid-gray mt-1.5">
-            {t("voiceless.onboarding.subtitle")}
-          </p>
-          <h2 className="text-base font-semibold mt-8 pb-2 border-b border-mid-gray/20">
-            {t("voiceless.onboarding.stepPermissions")}
-          </h2>
-          <div className="divide-y divide-mid-gray/15">
+      <Frame>
+        <h1 className="text-[28px] leading-9 font-bold tracking-tight">
+          {t("voiceless.onboarding.welcome")}
+        </h1>
+        <p className="text-sm text-mid-gray mt-1.5 leading-relaxed">
+          {t("voiceless.onboarding.subtitle")}
+        </p>
+        <div className="mt-8">
+          <Section title={t("voiceless.onboarding.stepPermissions")}>
             <PermissionRows state={state} />
-          </div>
-          <div className="mt-4">
-            <FnSettingNotice usage={usage} />
-          </div>
-          <p className="text-[13px] text-mid-gray mt-4">
-            {t("voiceless.permissions.restartHint")}
-          </p>
-          <div className="mt-6 flex justify-end">
-            <Button
-              variant="primary"
-              size="lg"
-              disabled={!canContinue}
-              onClick={() => setStep("model")}
-            >
-              {t("voiceless.onboarding.continue")}
-            </Button>
-          </div>
+          </Section>
         </div>
-      </div>
+        <div className="mt-4">
+          <FnSettingNotice usage={usage} />
+        </div>
+        <p className="text-[13px] text-mid-gray mt-4 leading-relaxed">
+          {t("voiceless.permissions.restartHint")}
+        </p>
+        <div className="mt-6 flex justify-end">
+          <Button
+            variant="primary"
+            size="lg"
+            disabled={!canContinue}
+            onClick={() => setStep("model")}
+          >
+            {t("voiceless.onboarding.continue")}
+          </Button>
+        </div>
+      </Frame>
     );
   }
 
   return (
-    <div className="h-screen overflow-y-auto bg-background text-text select-none">
-      <div className="max-w-[560px] mx-auto px-8 pt-14 pb-10">
-        <h1 className="text-[28px] font-bold tracking-tight">
-          {t("voiceless.onboarding.welcome")}
-        </h1>
-        <h2 className="text-base font-semibold mt-8 pb-3">
-          {t("voiceless.onboarding.stepModel")}
-        </h2>
-        <div className="flex flex-col gap-3">
-          <Choice
-            icon={<Download size={20} />}
-            title={t("voiceless.onboarding.download")}
-            description={t("voiceless.onboarding.downloadDesc")}
-            disabled={pending !== null}
-            onClick={() => {
-              setPending("download");
-              if (!senseVoice?.is_downloaded)
-                void downloadModel(SENSE_VOICE_ID);
-            }}
-            trailing={
-              pending === "download" ? (
-                <span className="flex items-center gap-2 text-[13px] text-mid-gray tabular-nums">
-                  <Loader2 size={15} className="animate-spin" />
-                  {downloading
-                    ? t("voiceless.models.local.downloading", { percent })
-                    : t("voiceless.onboarding.finishing")}
-                </span>
-              ) : null
-            }
-          />
-          <Choice
-            icon={<FolderOpen size={20} />}
-            title={t("voiceless.onboarding.import")}
-            description={t("voiceless.onboarding.importDesc")}
-            disabled={pending !== null}
-            onClick={async () => {
-              setPending("import");
-              const ok = await importSenseVoiceFolder(t);
-              if (ok) {
-                await updateSetting("asr_provider", "local");
-                onDone("shortcuts");
-              } else {
-                setPending(null);
+    <Frame>
+      <h1 className="text-[28px] leading-9 font-bold tracking-tight">
+        {t("voiceless.onboarding.welcome")}
+      </h1>
+      <div className="mt-8">
+        <Section title={t("voiceless.onboarding.stepModel")}>
+          <div className="py-4 flex flex-col gap-3">
+            <Choice
+              icon={<Download size={20} />}
+              title={t("voiceless.onboarding.download")}
+              description={t("voiceless.onboarding.downloadDesc")}
+              disabled={pending !== null}
+              onClick={() => {
+                setPending("download");
+                if (!senseVoice?.is_downloaded)
+                  void downloadModel(SENSE_VOICE_ID);
+              }}
+              trailing={
+                pending === "download" ? (
+                  <span className="flex items-center gap-2 whitespace-nowrap text-[13px] text-mid-gray tabular-nums">
+                    <Loader2 size={15} className="animate-spin" />
+                    {downloading
+                      ? t("voiceless.models.local.downloading", { percent })
+                      : t("voiceless.onboarding.finishing")}
+                  </span>
+                ) : null
               }
-            }}
-          />
-          <Choice
-            icon={<Cloud size={20} />}
-            title={t("voiceless.onboarding.cloud")}
-            description={t("voiceless.onboarding.cloudDesc")}
-            disabled={pending !== null}
-            onClick={async () => {
-              setPending("cloud");
-              await updateSetting("asr_provider", "cloud");
-              await commands.completeOnboarding();
-              onDone("models");
-            }}
-          />
-        </div>
-        <div className="mt-6 flex justify-start">
-          <Button
-            variant="ghost"
-            onClick={() => setStep("permissions")}
-            disabled={pending !== null}
-          >
-            {t("voiceless.onboarding.back")}
-          </Button>
-        </div>
+            />
+            <Choice
+              icon={<FolderOpen size={20} />}
+              title={t("voiceless.onboarding.import")}
+              description={t("voiceless.onboarding.importDesc")}
+              disabled={pending !== null}
+              onClick={async () => {
+                setPending("import");
+                const ok = await importSenseVoiceFolder(t);
+                if (ok) {
+                  await updateSetting("asr_provider", "local");
+                  onDone("shortcuts");
+                } else {
+                  setPending(null);
+                }
+              }}
+            />
+            <Choice
+              icon={<Cloud size={20} />}
+              title={t("voiceless.onboarding.cloud")}
+              description={t("voiceless.onboarding.cloudDesc")}
+              disabled={pending !== null}
+              onClick={async () => {
+                setPending("cloud");
+                await updateSetting("asr_provider", "cloud");
+                await commands.completeOnboarding();
+                onDone("models");
+              }}
+            />
+          </div>
+        </Section>
       </div>
-    </div>
+      <div className="mt-2 flex justify-start">
+        <Button
+          variant="ghost"
+          onClick={() => setStep("permissions")}
+          disabled={pending !== null}
+        >
+          {t("voiceless.onboarding.back")}
+        </Button>
+      </div>
+    </Frame>
   );
 };

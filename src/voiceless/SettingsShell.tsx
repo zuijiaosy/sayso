@@ -46,7 +46,7 @@ export const SettingsShell: React.FC<{
 
   return (
     <div className="h-screen flex select-none cursor-default bg-background text-text">
-      <nav className="w-[184px] shrink-0 border-e border-mid-gray/15 bg-mid-gray/5 flex flex-col pt-10 px-3 gap-0.5">
+      <nav className="w-[184px] shrink-0 border-e border-mid-gray/15 bg-mid-gray/5 flex flex-col pt-8 px-3 gap-0.5">
         <div className="px-3 pb-5 text-lg font-bold tracking-tight">
           {t("voiceless.appName")}
         </div>
@@ -66,8 +66,8 @@ export const SettingsShell: React.FC<{
           </button>
         ))}
       </nav>
-      <main className="flex-1 overflow-y-auto">
-        <div className="px-8 pt-4">
+      <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
+        <div className="w-full max-w-[680px] mx-auto px-8 pt-4">
           <SecureInputWarning />
         </div>
         <Active />

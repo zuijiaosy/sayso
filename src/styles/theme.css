@@ -22,6 +22,8 @@
   --light-color-error: #dc2626;
   --dark-color-warning: #fbbf24;
   --dark-color-error: #f87171;
+  --light-color-success: #16a34a;
+  --dark-color-success: #4ade80;
 
   /* Tokens that do not change between light and dark */
   --color-background-ui: #3461f0;
@@ -36,6 +38,7 @@
   --color-logo-stroke: var(--light-color-logo-stroke);
   --color-warning: var(--light-color-warning);
   --color-error: var(--light-color-error);
+  --color-success: var(--light-color-success);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -46,6 +49,7 @@
     --color-logo-stroke: var(--dark-color-logo-stroke);
     --color-warning: var(--dark-color-warning);
     --color-error: var(--dark-color-error);
+    --color-success: var(--dark-color-success);
   }
 }
 
@@ -66,6 +70,7 @@
   --color-logo-stroke: var(--light-color-logo-stroke);
   --color-warning: var(--light-color-warning);
   --color-error: var(--light-color-error);
+  --color-success: var(--light-color-success);
 }
 
 :root[data-theme="dark"] {
@@ -75,4 +80,5 @@
   --color-logo-stroke: var(--dark-color-logo-stroke);
   --color-warning: var(--dark-color-warning);
   --color-error: var(--dark-color-error);
+  --color-success: var(--dark-color-success);
 }

@@ -5,6 +5,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import { Plus, RotateCcw, X } from "lucide-react";
 import { commands } from "@/bindings";
+import { Button } from "@/components/ui/Button";
 import { useSettings } from "@/hooks/useSettings";
 import { SECURE_INPUT_HELP_URL } from "@/components/SecureInputWarning";
 import { bindingChips } from "./keys";
@@ -131,7 +132,7 @@ const BindingBox: React.FC<{
   trailing?: React.ReactNode;
 }> = ({ chips, recording, placeholder, onClick, trailing }) => (
   <div
-    className={`flex items-center gap-2 min-h-[52px] w-[260px] ps-2 pe-2 py-2 rounded-2xl border transition-colors ${
+    className={`flex items-center gap-2 min-h-[52px] w-[232px] max-w-full ps-2 pe-2 py-2 rounded-2xl border transition-colors ${
       recording
         ? "border-background-ui ring-2 ring-background-ui/20"
         : "border-mid-gray/30 hover:border-mid-gray/60"
@@ -139,7 +140,7 @@ const BindingBox: React.FC<{
   >
     <button
       type="button"
-      className="flex-1 flex flex-wrap items-center gap-2 text-start cursor-pointer min-h-9"
+      className="flex-1 min-w-0 flex flex-wrap items-center gap-2 text-start cursor-pointer min-h-9"
       onClick={onClick}
     >
       {chips.length > 0 ? (
@@ -214,7 +215,7 @@ export const ShortcutField: React.FC<{
               type="button"
               title={t("voiceless.shortcuts.reset")}
               aria-label={t("voiceless.shortcuts.reset")}
-              className="p-1.5 rounded-md text-mid-gray hover:text-text hover:bg-mid-gray/15 cursor-pointer"
+              className="shrink-0 p-1.5 rounded-md text-mid-gray hover:text-text hover:bg-mid-gray/15 cursor-pointer"
               onClick={() => void resetBinding(bindingId)}
             >
               <RotateCcw size={15} />
@@ -233,7 +234,7 @@ export const ShortcutField: React.FC<{
               type="button"
               title={t("voiceless.shortcuts.remove")}
               aria-label={t("voiceless.shortcuts.remove")}
-              className="p-1.5 rounded-md text-mid-gray hover:text-text hover:bg-mid-gray/15 cursor-pointer"
+              className="shrink-0 p-1.5 rounded-md text-mid-gray hover:text-text hover:bg-mid-gray/15 cursor-pointer"
               onClick={() => {
                 void stop();
                 setShowAltSlot(false);
@@ -246,9 +247,9 @@ export const ShortcutField: React.FC<{
         />
       )}
       {!altSet && !showAltSlot && recordingId !== altBindingId && (
-        <button
-          type="button"
-          className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl border border-mid-gray/30 text-sm hover:bg-mid-gray/10 cursor-pointer"
+        <Button
+          variant="secondary"
+          size="md"
           onClick={() => {
             setShowAltSlot(true);
             void start(altBindingId);
@@ -256,7 +257,7 @@ export const ShortcutField: React.FC<{
         >
           <Plus size={15} />
           {t("voiceless.shortcuts.addAnother")}
-        </button>
+        </Button>
       )}
     </div>
   );

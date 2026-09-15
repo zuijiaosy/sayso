@@ -24,7 +24,7 @@ export const Section: React.FC<{
   children: React.ReactNode;
 }> = ({ icon, title, description, actions, children }) => (
   <section>
-    <div className="flex items-center gap-2.5 pb-3 border-b border-mid-gray/20">
+    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pb-3 border-b border-mid-gray/20">
       {icon && <span className="text-mid-gray shrink-0">{icon}</span>}
       <div className="flex-1 min-w-0">
         <h2 className="text-base font-semibold text-text/80">{title}</h2>
@@ -34,7 +34,9 @@ export const Section: React.FC<{
           </p>
         )}
       </div>
-      {actions}
+      {actions && (
+        <div className="shrink-0 flex items-center gap-2">{actions}</div>
+      )}
     </div>
     <div className="divide-y divide-mid-gray/15">{children}</div>
   </section>
@@ -50,7 +52,7 @@ export const Row: React.FC<{
     className={
       stacked
         ? "py-4 flex flex-col gap-3"
-        : "py-4 flex items-start justify-between gap-6"
+        : "py-4 flex items-start justify-between gap-4"
     }
   >
     <div className="min-w-0 flex-1">
@@ -62,7 +64,13 @@ export const Row: React.FC<{
       )}
     </div>
     {children !== undefined && (
-      <div className={stacked ? "w-full" : "shrink-0 flex items-center"}>
+      <div
+        className={
+          stacked
+            ? "w-full min-w-0"
+            : "shrink-0 min-w-0 max-w-[60%] flex items-center justify-end"
+        }
+      >
         {children}
       </div>
     )}
@@ -137,7 +145,7 @@ export const TextInput = React.forwardRef<
 >(({ className = "", ...props }, ref) => (
   <input
     ref={ref}
-    className={`h-9 px-3 text-sm rounded-lg border border-mid-gray/30 bg-background focus:outline-none focus:border-background-ui focus:ring-2 focus:ring-background-ui/20 disabled:opacity-60 ${className}`}
+    className={`h-9 min-w-0 px-3 text-sm rounded-lg border border-mid-gray/30 bg-background focus:outline-none focus:border-background-ui focus:ring-2 focus:ring-background-ui/20 disabled:opacity-60 ${className}`}
     {...props}
   />
 ));
@@ -147,7 +155,7 @@ export const SelectInput: React.FC<
   React.SelectHTMLAttributes<HTMLSelectElement>
 > = ({ className = "", children, ...props }) => (
   <select
-    className={`h-9 px-3 pe-8 text-sm rounded-lg border border-mid-gray/30 bg-background focus:outline-none focus:border-background-ui cursor-pointer disabled:opacity-60 ${className}`}
+    className={`h-9 min-w-0 max-w-full px-3 pe-8 text-sm rounded-lg border border-mid-gray/30 bg-background focus:outline-none focus:border-background-ui cursor-pointer disabled:opacity-60 ${className}`}
     {...props}
   >
     {children}
@@ -186,7 +194,7 @@ export const Notice: React.FC<{
       {title && <div className="font-semibold mb-0.5">{title}</div>}
       {children}
     </div>
-    {action}
+    {action && <div className="shrink-0">{action}</div>}
   </div>
 );
 
@@ -196,11 +204,11 @@ export const StatusPill: React.FC<{
 }> = ({ ok, children }) => (
   <span
     className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${
-      ok ? "text-green-600 dark:text-green-400" : "text-mid-gray"
+      ok ? "text-success" : "text-mid-gray"
     }`}
   >
     <span
-      className={`w-2 h-2 rounded-full ${ok ? "bg-green-500" : "bg-mid-gray/50"}`}
+      className={`w-2 h-2 shrink-0 rounded-full ${ok ? "bg-success" : "bg-mid-gray/50"}`}
     />
     {children}
   </span>
