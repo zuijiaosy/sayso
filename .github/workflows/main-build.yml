@@ -1,6 +1,6 @@
 name: "Main Branch Build"
 
-# Builds the macOS and Windows installers on every push to main so each commit
+# Builds the macOS Apple Silicon installer on every push to main so each commit
 # has a downloadable build. Artifacts are kept for 30 days.
 #
 # Binaries are unsigned: macOS gets Tauri's ad-hoc signature ("-" in
@@ -18,27 +18,14 @@ concurrency:
 
 jobs:
   build:
+    name: "Build macOS ARM64"
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: "macos-26"
-            args: "--target aarch64-apple-darwin"
-            target: "aarch64-apple-darwin"
-          - platform: "macos-latest"
-            args: "--target x86_64-apple-darwin"
-            target: "x86_64-apple-darwin"
-          - platform: "windows-latest"
-            args: ""
-            target: "x86_64-pc-windows-msvc"
-
     uses: ./.github/workflows/build.yml
     with:
-      platform: ${{ matrix.platform }}
-      target: ${{ matrix.target }}
-      build-args: ${{ matrix.args }}
+      platform: "macos-26"
+      target: "aarch64-apple-darwin"
+      build-args: "--target aarch64-apple-darwin"
       asset-prefix: "voiceless"
       upload-artifacts: true
       sign-binaries: false
@@ -59,7 +46,7 @@ jobs:
           cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
           ## Voiceless installers
 
-          Download the macOS and Windows installers from the **Artifacts** section of this workflow run.
+          Download the macOS Apple Silicon installer from the **Artifacts** section of this workflow run.
 
           The GitHub Actions builds are unsigned. After moving the macOS app to `/Applications`, verify that it came from this repository, then run:
 
