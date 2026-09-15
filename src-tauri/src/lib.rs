@@ -737,6 +737,8 @@ pub fn run(cli_args: CliArgs) {
             commands::voice::test_dashscope_asr,
             commands::voice::import_dictionary_text,
             commands::voice::export_dictionary_text,
+            commands::voice::import_sense_voice_model,
+            commands::voice::complete_onboarding,
             commands::voice::update_dictation_post_mode,
             commands::voice::update_dictionary,
             commands::get_app_dir_path,

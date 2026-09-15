@@ -663,6 +663,25 @@ async importDictionaryText(text: string, replace: boolean) : Promise<DictionaryE
 async exportDictionaryText() : Promise<string> {
     return await TAURI_INVOKE("export_dictionary_text");
 },
+/**
+ * Link (or copy, across volumes) an existing SenseVoice int8 model — for
+ * example sherpa-onnx's `sense-voice-zh-en-ja-ko-yue-int8` release — into the
+ * models folder, then select it. Nothing is downloaded.
+ */
+async importSenseVoiceModel(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("import_sense_voice_model", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Finish first-run setup without a local model (cloud recognition).
+ */
+async completeOnboarding() : Promise<void> {
+    await TAURI_INVOKE("complete_onboarding");
+},
 async updateDictationPostMode(mode: DictationPostMode) : Promise<void> {
     await TAURI_INVOKE("update_dictation_post_mode", { mode });
 },

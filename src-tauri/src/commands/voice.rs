@@ -329,6 +329,86 @@ pub fn export_dictionary_text(app: AppHandle) -> String {
     format_dictionary_text(&get_settings(&app).dictionary)
 }
 
+pub const SENSE_VOICE_MODEL_ID: &str = "sense-voice-int8";
+const SENSE_VOICE_FILES: [&str; 2] = ["model.int8.onnx", "tokens.txt"];
+
+/// Find the SenseVoice files inside `dir` (the folder itself, or one level down,
+/// so both `.../sherpa-onnx-sense-voice-...` and its parent work).
+pub fn locate_sense_voice_files(dir: &std::path::Path) -> Option<std::path::PathBuf> {
+    let has_files = |d: &std::path::Path| SENSE_VOICE_FILES.iter().all(|f| d.join(f).is_file());
+    if has_files(dir) {
+        return Some(dir.to_path_buf());
+    }
+    std::fs::read_dir(dir)
+        .ok()?
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .find(|p| has_files(p))
+}
+
+/// Link (or copy, across volumes) an existing SenseVoice int8 model — for
+/// example sherpa-onnx's `sense-voice-zh-en-ja-ko-yue-int8` release — into the
+/// models folder, then select it. Nothing is downloaded.
+#[tauri::command]
+#[specta::specta]
+pub async fn import_sense_voice_model(app: AppHandle, path: String) -> Result<(), String> {
+    let source = locate_sense_voice_files(std::path::Path::new(&path))
+        .ok_or_else(|| "The folder must contain model.int8.onnx and tokens.txt".to_string())?;
+    let models_dir = crate::portable::app_data_dir(&app)
+        .map_err(|e| format!("Failed to resolve the app data folder: {e}"))?
+        .join("models");
+    let target = models_dir.join(SENSE_VOICE_MODEL_ID);
+    let staging = models_dir.join(format!("{SENSE_VOICE_MODEL_ID}.importing"));
+
+    let copy_result = tauri::async_runtime::spawn_blocking({
+        let source = source.clone();
+        let staging = staging.clone();
+        let target = target.clone();
+        move || -> Result<(), String> {
+            let _ = std::fs::remove_dir_all(&staging);
+            std::fs::create_dir_all(&staging).map_err(|e| e.to_string())?;
+            for file in SENSE_VOICE_FILES {
+                let from = source.join(file);
+                let to = staging.join(file);
+                if std::fs::hard_link(&from, &to).is_err() {
+                    std::fs::copy(&from, &to).map_err(|e| format!("Failed to copy {file}: {e}"))?;
+                }
+            }
+            if target.exists() {
+                std::fs::remove_dir_all(&target).map_err(|e| e.to_string())?;
+            }
+            std::fs::rename(&staging, &target).map_err(|e| e.to_string())
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    if let Err(e) = copy_result {
+        let _ = std::fs::remove_dir_all(&staging);
+        return Err(e);
+    }
+
+    let model_manager = app.state::<std::sync::Arc<crate::managers::model::ModelManager>>();
+    model_manager
+        .rescan_local_models()
+        .map_err(|e| e.to_string())?;
+    let app_for_switch = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::commands::models::switch_active_model(&app_for_switch, SENSE_VOICE_MODEL_ID)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Finish first-run setup without a local model (cloud recognition).
+#[tauri::command]
+#[specta::specta]
+pub fn complete_onboarding(app: AppHandle) {
+    let mut settings = get_settings(&app);
+    settings.onboarding_completed = true;
+    write_settings(&app, settings);
+}
+
 fn trimmed_opt(value: Option<String>) -> Option<String> {
     value
         .map(|v| v.trim().to_string())
@@ -378,6 +458,22 @@ pub fn normalize_dictionary(entries: Vec<DictionaryEntry>) -> Vec<DictionaryEntr
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn locates_sense_voice_files_in_folder_or_child() {
+        let root = tempfile::tempdir().unwrap();
+        let child = root.path().join("sherpa-onnx-sense-voice");
+        std::fs::create_dir_all(&child).unwrap();
+        assert!(locate_sense_voice_files(root.path()).is_none());
+        std::fs::write(child.join("model.int8.onnx"), b"x").unwrap();
+        assert!(
+            locate_sense_voice_files(root.path()).is_none(),
+            "tokens.txt missing"
+        );
+        std::fs::write(child.join("tokens.txt"), b"x").unwrap();
+        assert_eq!(locate_sense_voice_files(root.path()).unwrap(), child);
+        assert_eq!(locate_sense_voice_files(&child).unwrap(), child);
+    }
 
     #[test]
     fn parses_all_line_formats() {
