@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod history;
 pub mod models;
+pub mod system;
 pub mod transcription;
 
 use crate::settings::{

@@ -148,11 +148,14 @@ fn apply_startup_activation_policy(app: &mut tauri::App, headless_mode: bool) {
     let cli_args = app.state::<CliArgs>().inner().clone();
     let settings = settings::get_settings(app.handle());
 
-    let should_hide = settings.start_hidden || cli_args.start_hidden;
     let tray_available = settings.show_tray_icon && !cli_args.no_tray;
 
-    if should_hide && tray_available {
-        log::info!("Starting hidden with tray available: launching as Accessory (no Dock icon)");
+    // Voiceless is a menu-bar app: whenever a tray icon exists it launches as
+    // Accessory. If the settings window is shown at startup (first-run
+    // onboarding), `show_main_window` promotes to Regular, which is the
+    // supported direction; closing it demotes back.
+    if tray_available {
+        log::info!("Tray available: launching as Accessory (no Dock icon)");
         app.set_activation_policy(tauri::ActivationPolicy::Accessory);
     }
 }
@@ -715,6 +718,8 @@ pub fn run(cli_args: CliArgs) {
             commands::cancel_operation,
             commands::is_portable,
             commands::is_update_checks_locked,
+            commands::system::get_fn_key_usage,
+            commands::system::open_system_settings_pane,
             commands::get_app_dir_path,
             commands::get_app_settings,
             commands::get_default_settings,
@@ -814,11 +819,11 @@ pub fn run(cli_args: CliArgs) {
                     Target::new(if let Some(data_dir) = portable::data_dir() {
                         TargetKind::Folder {
                             path: data_dir.join("logs"),
-                            file_name: Some("handy".into()),
+                            file_name: Some("voiceless".into()),
                         }
                     } else {
                         TargetKind::LogDir {
-                            file_name: Some("handy".into()),
+                            file_name: Some("voiceless".into()),
                         }
                     })
                     .filter(|metadata| {
@@ -874,7 +879,6 @@ pub fn run(cli_args: CliArgs) {
     let mut app = builder
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_macos_permissions::init())
@@ -942,7 +946,7 @@ pub fn run(cli_args: CliArgs) {
             // for portable mode (redirects WebView2 cache to portable Data dir)
             let mut win_builder =
                 tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
-                    .title("Handy")
+                    .title("Voiceless")
                     .inner_size(680.0, 570.0)
                     .min_inner_size(680.0, 570.0)
                     .resizable(true)
@@ -1040,7 +1044,10 @@ pub fn run(cli_args: CliArgs) {
             // CLI --start-hidden flag overrides the setting.
             // But if permission onboarding is required, always show the window.
             let should_hide = settings.start_hidden || cli_args.start_hidden;
-            let should_force_show = should_force_show_permissions_window(&app_handle);
+            // First run always opens the window so permissions and the model
+            // can be set up; afterwards Voiceless lives in the menu bar.
+            let should_force_show = should_force_show_permissions_window(&app_handle)
+                || !settings.onboarding_completed;
 
             // If start_hidden but tray is disabled, we must show the window
             // anyway. Without a tray icon, the dock is the only way back in.

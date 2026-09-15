@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Handy",
-  "version": "0.9.6",
-  "identifier": "com.pais.handy",
+  "productName": "Voiceless",
+  "version": "0.1.0",
+  "identifier": "com.voiceless.app",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -17,7 +17,9 @@
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": ["**"],
+          "allow": [
+            "**"
+          ],
           "requireLiteralLeadingDot": false
         }
       }
@@ -25,9 +27,10 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": true,
     "targets": "all",
-    "resources": ["resources/**/*"],
+    "resources": [
+      "resources/**/*"
+    ],
     "license": "MIT",
     "icon": [
       "icons/32x32.png",
@@ -39,15 +42,18 @@
     "macOS": {
       "files": {},
       "hardenedRuntime": true,
-      "minimumSystemVersion": "10.15",
+      "minimumSystemVersion": "13.0",
       "signingIdentity": "-",
       "entitlements": "Entitlements.plist"
     },
     "linux": {
       "deb": {
-        "depends": ["libgtk-layer-shell0", "libopenblas0"],
+        "depends": [
+          "libgtk-layer-shell0",
+          "libopenblas0"
+        ],
         "files": {
-          "/usr/lib/Handy": "transcribe-libs"
+          "/usr/lib/Voiceless": "transcribe-libs"
         }
       },
       "rpm": {
@@ -59,7 +65,7 @@
           "type": "none"
         },
         "files": {
-          "/usr/lib/Handy": "transcribe-libs"
+          "/usr/lib/Voiceless": "transcribe-libs"
         }
       },
       "appimage": {
@@ -70,18 +76,9 @@
       }
     },
     "windows": {
-      "signCommand": "trusted-signing-cli -e https://eus.codesigning.azure.net/ -a CJ-Signing -c cjpais-dev -d Handy %1",
       "nsis": {
         "template": "nsis/installer.nsi"
       }
-    }
-  },
-  "plugins": {
-    "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJBQjcyMDk1MjA2NjAxRjkKUldUNUFXWWdsU0MzdXRRZi8zYzhqV2FaNUVDbDd2Rk5VM1IvWWowVXdmRFNKQ1BrMXF5RFFsLy8K",
-      "endpoints": [
-        "https://github.com/cjpais/Handy/releases/latest/download/latest.json"
-      ]
     }
   }
 }

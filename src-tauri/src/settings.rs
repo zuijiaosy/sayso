@@ -539,7 +539,9 @@ fn default_translate_to_english() -> bool {
 }
 
 fn default_start_hidden() -> bool {
-    false
+    // Voiceless is a menu-bar app; the window only opens on demand (and for
+    // first-run onboarding, see lib.rs).
+    true
 }
 
 fn default_autostart_enabled() -> bool {
@@ -547,7 +549,8 @@ fn default_autostart_enabled() -> bool {
 }
 
 fn default_update_checks_enabled() -> bool {
-    true
+    // Voiceless ships no update feed yet.
+    false
 }
 
 fn default_show_whats_new_on_update() -> bool {
@@ -958,7 +961,9 @@ pub fn get_default_settings() -> AppSettings {
         show_tray_icon: default_show_tray_icon(),
         paste_delay_ms: default_paste_delay_ms(),
         paste_delay_after_ms: default_paste_delay_after_ms(),
-        reliable_paste: false,
+        // Receipt-sequenced paste restores the clipboard only after the target
+        // app actually read it (see paste_tx). Voiceless enables it on macOS.
+        reliable_paste: cfg!(target_os = "macos"),
         typing_tool: default_typing_tool(),
         external_script_path: None,
         filler_word_removal_enabled: default_filler_word_removal_enabled(),
@@ -1195,7 +1200,11 @@ fn apply_settings_migrations(
 pub fn update_checks_forced_disabled() -> bool {
     use std::sync::OnceLock;
     static IS_UPDATER_DISABLED: OnceLock<bool> = OnceLock::new();
-    *IS_UPDATER_DISABLED.get_or_init(|| utils::env_flag_enabled("HANDY_DISABLE_UPDATER"))
+    // Voiceless has no update endpoint, so the updater is always locked off.
+    *IS_UPDATER_DISABLED.get_or_init(|| {
+        let _ = utils::env_flag_enabled("HANDY_DISABLE_UPDATER");
+        true
+    })
 }
 
 /// Effective updater state: the user's stored preference, overridden to `false`

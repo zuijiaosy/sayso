@@ -1,8 +1,8 @@
 [package]
 name = "handy"
-version = "0.9.6"
-description = "Handy"
-authors = ["cjpais"]
+version = "0.1.0"
+description = "Voiceless - local-first voice input (derived from Handy)"
+authors = ["cjpais", "Voiceless contributors"]
 edition = "2021"
 license = "MIT"
 default-run = "handy"
@@ -98,7 +98,6 @@ signal-hook = "0.3"
 tauri-plugin-autostart = "2.5.1"
 tauri-plugin-global-shortcut = "2.3.1"
 tauri-plugin-single-instance = "2.3.2"
-tauri-plugin-updater = "2.10.1"
 
 [target.'cfg(windows)'.dependencies]
 # Used to reach ICoreWebView2Settings3 through the webview's controller
