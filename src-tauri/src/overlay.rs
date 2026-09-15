@@ -53,13 +53,93 @@ const OVERLAY_HEIGHT: f64 = 50.0;
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
 
+// Voiceless layouts (logical points; keep in sync with RecordingOverlay.css).
+// Translate mode stacks the "Translate to" row above the capsule; opening the
+// language list needs room for the list; a translation failure shows the
+// source text with retry / copy actions.
+const OVERLAY_TRANSLATE_WIDTH: f64 = 320.0;
+const OVERLAY_TRANSLATE_HEIGHT: f64 = 104.0;
+const OVERLAY_PICKER_HEIGHT: f64 = 380.0;
+const OVERLAY_FAILURE_WIDTH: f64 = 380.0;
+const OVERLAY_FAILURE_HEIGHT: f64 = 132.0;
+
+static OVERLAY_TRANSLATE_MODE: AtomicBool = AtomicBool::new(false);
+static OVERLAY_PICKER_OPEN: AtomicBool = AtomicBool::new(false);
+static OVERLAY_LAST_STATE: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
 /// Overlay window size (logical) for a given UI state.
 fn overlay_dimensions(state: &str) -> (f64, f64) {
+    if state == "translate_failed" {
+        return (OVERLAY_FAILURE_WIDTH, OVERLAY_FAILURE_HEIGHT);
+    }
+    if OVERLAY_TRANSLATE_MODE.load(Ordering::Relaxed) {
+        let height = if OVERLAY_PICKER_OPEN.load(Ordering::Relaxed) {
+            OVERLAY_PICKER_HEIGHT
+        } else {
+            OVERLAY_TRANSLATE_HEIGHT
+        };
+        return (OVERLAY_TRANSLATE_WIDTH, height);
+    }
     if state == "streaming" {
         (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT)
     } else {
         (OVERLAY_WIDTH, OVERLAY_HEIGHT)
     }
+}
+
+/// Record the session mode for overlay sizing and, if the overlay is showing,
+/// resize it in place (Fn held, then Left Shift).
+pub fn set_overlay_session_mode(app_handle: &AppHandle, mode: crate::voice::SessionMode) {
+    let translate = mode == crate::voice::SessionMode::Translate;
+    let changed = OVERLAY_TRANSLATE_MODE.swap(translate, Ordering::SeqCst) != translate;
+    if !translate {
+        OVERLAY_PICKER_OPEN.store(false, Ordering::SeqCst);
+    }
+    if changed {
+        resize_visible_overlay(app_handle);
+    }
+}
+
+/// The overlay's language list opened or closed; grow or shrink the window.
+pub fn set_overlay_picker_open(app_handle: &AppHandle, open: bool) {
+    if OVERLAY_PICKER_OPEN.swap(open, Ordering::SeqCst) != open {
+        resize_visible_overlay(app_handle);
+    }
+}
+
+fn resize_visible_overlay(app_handle: &AppHandle) {
+    let handle = app_handle.clone();
+    let _ = app_handle.run_on_main_thread(move || {
+        let Some(window) = handle.get_webview_window("recording_overlay") else {
+            return;
+        };
+        if !window.is_visible().unwrap_or(false) {
+            return;
+        }
+        let state = OVERLAY_LAST_STATE
+            .lock()
+            .map(|s| s.clone())
+            .unwrap_or_default();
+        let (width, height) = overlay_dimensions(&state);
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }));
+            if let Some((x, y)) = calculate_overlay_position(&handle, width, height) {
+                let _ =
+                    window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
+            }
+        }
+        #[cfg(target_os = "windows")]
+        if let Err(error) = place_windows_overlay(&handle, &window, width, height) {
+            log::error!("Failed to resize recording overlay: {error}");
+        }
+    });
+}
+
+/// Shows the translation failure card (source text + retry / copy).
+pub fn show_translation_failed_overlay(app_handle: &AppHandle) {
+    OVERLAY_PICKER_OPEN.store(false, Ordering::SeqCst);
+    show_overlay_state(app_handle, "translate_failed");
 }
 
 static LAST_MIC_LEVEL_EMIT: AtomicU64 = AtomicU64::new(0);
@@ -508,6 +588,9 @@ fn show_overlay_state(app_handle: &AppHandle, state: &str) {
 }
 
 fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
+    if let Ok(mut last) = OVERLAY_LAST_STATE.lock() {
+        *last = state.to_string();
+    }
     // Size the overlay for this state (compact vs. streaming), then position it.
     let (width, height) = overlay_dimensions(state);
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
@@ -689,6 +772,7 @@ static OVERLAY_SHOW_GENERATION: AtomicU64 = AtomicU64::new(0);
 pub fn hide_recording_overlay(app_handle: &AppHandle) {
     // Always hide the overlay regardless of settings - if setting was changed while recording,
     // we still want to hide it properly
+    OVERLAY_PICKER_OPEN.store(false, Ordering::SeqCst);
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
         // Snapshot before doing anything observable, so any show that lands
         // after this point invalidates the delayed hide below.

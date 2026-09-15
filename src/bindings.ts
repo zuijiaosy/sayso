@@ -21,6 +21,18 @@ async resetBinding(id: string) : Promise<Result<BindingResponse, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Clear an optional shortcut (the "add another" slots). Primary shortcuts
+ * cannot be cleared so there is always a way to start each mode.
+ */
+async clearBinding(id: string) : Promise<Result<BindingResponse, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("clear_binding", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeShortcutActivationSetting(activation: ShortcutActivation) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_shortcut_activation_setting", { activation }) };
@@ -536,6 +548,91 @@ async isPortable() : Promise<boolean> {
 async isUpdateChecksLocked() : Promise<boolean> {
     return await TAURI_INVOKE("is_update_checks_locked");
 },
+/**
+ * Read `AppleFnUsageType` without modifying it. Voiceless never writes this
+ * preference; the UI only links the user to Keyboard settings.
+ */
+async getFnKeyUsage() : Promise<FnKeyUsage> {
+    return await TAURI_INVOKE("get_fn_key_usage");
+},
+/**
+ * Open a System Settings pane relevant to Voiceless.
+ * `pane`: `keyboard` | `accessibility` | `input_monitoring` | `microphone`.
+ */
+async openSystemSettingsPane(pane: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_system_settings_pane", { pane }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Overlay confirm button: stop recording and process what was said.
+ */
+async stopActiveRecording() : Promise<void> {
+    await TAURI_INVOKE("stop_active_recording");
+},
+async listTranslateTargets() : Promise<TranslateTarget[]> {
+    return await TAURI_INVOKE("list_translate_targets");
+},
+/**
+ * Choose the translation target from the overlay picker (or settings). It
+ * applies to the session being recorded and becomes the default.
+ */
+async setSessionTranslateTarget(code: string) : Promise<Result<SessionModeEvent, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_session_translate_target", { code }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getVoiceSession() : Promise<VoiceSessionSnapshot> {
+    return await TAURI_INVOKE("get_voice_session");
+},
+/**
+ * Retry the last failed translation and paste the result into the focused
+ * app (the overlay never takes focus, so it is still the original target).
+ */
+async retryFailedTranslation() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("retry_failed_translation") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Copy the untranslated source text so the user can handle it manually.
+ */
+async copyFailedTranslationSource() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("copy_failed_translation_source") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async dismissTranslationFailure() : Promise<void> {
+    await TAURI_INVOKE("dismiss_translation_failure");
+},
+/**
+ * The overlay's language list opened or closed.
+ */
+async setOverlayPickerOpen(open: boolean) : Promise<void> {
+    await TAURI_INVOKE("set_overlay_picker_open", { open });
+},
+async updateDictationPostMode(mode: DictationPostMode) : Promise<void> {
+    await TAURI_INVOKE("update_dictation_post_mode", { mode });
+},
+/**
+ * Replace the whole dictionary. Entries are trimmed, blank terms dropped, and
+ * aliases de-duplicated.
+ */
+async updateDictionary(entries: DictionaryEntry[]) : Promise<DictionaryEntry[]> {
+    return await TAURI_INVOKE("update_dictionary", { entries });
+},
 async getAppDirPath() : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_app_dir_path") };
@@ -928,12 +1025,16 @@ async isLaptop() : Promise<Result<boolean, string>> {
 
 export const events = __makeEvents__<{
 historyUpdatePayload: HistoryUpdatePayload,
+sessionModeEvent: SessionModeEvent,
 streamPhaseEvent: StreamPhaseEvent,
-streamTextEvent: StreamTextEvent
+streamTextEvent: StreamTextEvent,
+translationFailedEvent: TranslationFailedEvent
 }>({
 historyUpdatePayload: "history-update-payload",
+sessionModeEvent: "session-mode-event",
 streamPhaseEvent: "stream-phase-event",
-streamTextEvent: "stream-text-event"
+streamTextEvent: "stream-text-event",
+translationFailedEvent: "translation-failed-event"
 })
 
 /** user-defined constants **/
@@ -1004,13 +1105,61 @@ vad_backend?: VadBackend;
  * not gated on this — that follows model capability. Migrated from the old
  * `overlay_position` (position `none` → style `None`).
  */
-overlay_style?: OverlayStyle }
+overlay_style?: OverlayStyle; 
+/**
+ * Voiceless: how dictation text is post-processed by the text model.
+ */
+dictation_post_mode?: DictationPostMode; 
+/**
+ * Voiceless: BCP 47 code of the translation target, e.g. `en-US`.
+ */
+translate_target_language?: string; 
+/**
+ * Voiceless: custom dictionary.
+ */
+dictionary?: DictionaryEntry[] }
 export type AudioDevice = { index: string; name: string; is_default: boolean }
 export type AutoSubmitKey = "enter" | "ctrl_enter" | "cmd_enter"
 export type AvailableAccelerators = { transcribe: string[]; ort: string[]; gpu_devices: GpuDeviceOption[] }
 export type BindingResponse = { success: boolean; binding: ShortcutBinding | null; error: string | null }
 export type ClipboardHandling = "dont_modify" | "copy_to_clipboard"
 export type CustomSounds = { start: boolean; stop: boolean }
+/**
+ * What the text model does to a dictation (translation always uses the model).
+ */
+export type DictationPostMode = 
+/**
+ * Paste the recognized text as-is (after dictionary replacements).
+ */
+"off" | 
+/**
+ * Fix homophones, sentence breaks and punctuation only.
+ */
+"fix" | 
+/**
+ * Also remove fillers and smooth self-corrections, without changing meaning.
+ */
+"polish"
+/**
+ * One custom dictionary entry.
+ */
+export type DictionaryEntry = { 
+/**
+ * The spelling that should appear in the output, e.g. `Codex`.
+ */
+term: string; 
+/**
+ * Known misrecognitions that are replaced literally with `term`.
+ */
+aliases?: string[]; 
+/**
+ * Fixed translation used by translate mode.
+ */
+translation?: string | null; 
+/**
+ * Short hint that helps the text model understand the term.
+ */
+note?: string | null }
 export type EngineType = 
 /**
  * Any GGML/GGUF model loaded through transcribe-cpp (Whisper, Parakeet,
@@ -1018,6 +1167,34 @@ export type EngineType =
  * the file, so this one variant covers the whole transcribe-cpp family.
  */
 "TranscribeCpp" | "Parakeet" | "Moonshine" | "MoonshineStreaming" | "SenseVoice" | "GigaAM" | "Canary" | "Cohere"
+/**
+ * A translation that could not be completed. Kept so the overlay can offer
+ * retry / copy instead of silently pasting untranslated text.
+ */
+export type FailedTranslation = { source_text: string; target_language: string; 
+/**
+ * `no_text_model` | `request_failed` | `invalid_output`
+ */
+reason: string }
+/**
+ * What macOS does when the Fn/Globe key is pressed on its own
+ * (`com.apple.HIToolbox AppleFnUsageType`). Anything other than "do nothing"
+ * makes a bare Fn shortcut also switch input source, show emoji, or start
+ * system dictation.
+ */
+export type FnKeyUsage = { 
+/**
+ * Raw value, `None` when the key is unset or unreadable.
+ */
+value: number | null; 
+/**
+ * `do_nothing` | `change_input_source` | `emoji` | `dictation` | `unknown`
+ */
+action: string; 
+/**
+ * True when a bare Fn shortcut will not collide with a system action.
+ */
+compatible: boolean }
 export type GpuDeviceOption = { id: string; name: string; total_vram_mb: number }
 export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string; post_processed_text: string | null; post_process_prompt: string | null; post_process_requested: boolean }
 export type HistoryUpdatePayload = { action: "added"; entry: HistoryEntry } | { action: "updated"; entry: HistoryEntry } | { action: "deleted"; id: number } | { action: "toggled"; id: number }
@@ -1112,6 +1289,14 @@ uncovered_bindings: string[];
  */
 recorder_blocked: boolean }
 /**
+ * The two things a recording can turn into.
+ */
+export type SessionMode = "dictate" | "translate"
+/**
+ * Mode and target for the session currently recording (or last started).
+ */
+export type SessionModeEvent = { mode: SessionMode; target_language: string }
+/**
  * How the transcribe shortcut's key events drive a recording.
  */
 export type ShortcutActivation = 
@@ -1169,8 +1354,28 @@ export type StreamWorkKind = "transcribing" | "polishing"
  */
 export type Theme = "system" | "light" | "dark"
 export type TranscribeAcceleratorSetting = "auto" | "cpu" | "gpu"
+/**
+ * A target language offered in the overlay picker.
+ */
+export type TranslateTarget = { 
+/**
+ * BCP 47 tag, e.g. `en-US`. The UI localizes it with `Intl.DisplayNames`.
+ */
+code: string; 
+/**
+ * How the target is named inside the (Chinese) translation prompt.
+ */
+prompt_name: string }
+/**
+ * Overlay-visible outcome of a failed translation.
+ */
+export type TranslationFailedEvent = { failure: FailedTranslation }
 export type TypingTool = "auto" | "wtype" | "kwtype" | "dotool" | "ydotool" | "xdotool"
 export type VadBackend = "silero" | "earshot"
+/**
+ * Current session mode, target language and any pending translation failure.
+ */
+export type VoiceSessionSnapshot = { mode: SessionMode; target_language: string; failure: FailedTranslation | null }
 export type WindowsMicrophonePermissionStatus = { supported: boolean; overall_access: PermissionAccess; device_access: PermissionAccess; app_access: PermissionAccess; desktop_app_access: PermissionAccess }
 
 /** tauri-specta globals **/

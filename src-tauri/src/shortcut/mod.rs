@@ -210,6 +210,30 @@ pub fn change_binding(
     })
 }
 
+/// Clear an optional shortcut (the "add another" slots). Primary shortcuts
+/// cannot be cleared so there is always a way to start each mode.
+#[tauri::command]
+#[specta::specta]
+pub fn clear_binding(app: AppHandle, id: String) -> Result<BindingResponse, String> {
+    if id != crate::voice::BINDING_DICTATE_ALT && id != crate::voice::BINDING_TRANSLATE_ALT {
+        return Err(format!("Binding '{id}' cannot be cleared"));
+    }
+    let mut settings = settings::get_settings(&app);
+    let mut binding = settings::get_stored_binding(&app, &id);
+    if let Err(e) = unregister_shortcut(&app, binding.clone()) {
+        debug!("clear_binding: could not unregister '{}': {}", id, e);
+    }
+    binding.current_binding = String::new();
+    settings.bindings.insert(id, binding.clone());
+    settings::write_settings(&app, settings);
+    crate::secure_input::reconcile_fallback(&app);
+    Ok(BindingResponse {
+        success: true,
+        binding: Some(binding),
+        error: None,
+    })
+}
+
 /// Best-effort re-register of the previous binding after a failed change,
 /// so a failure leaves the user's shortcut working exactly as before.
 fn restore_registration(app: &AppHandle, binding: &ShortcutBinding) {
@@ -456,6 +480,11 @@ fn register_all_shortcuts_for_implementation(
             .get(id)
             .cloned()
             .unwrap_or_else(|| default_binding.clone());
+
+        // Unset optional shortcuts stay unset on every implementation.
+        if binding.current_binding.trim().is_empty() {
+            continue;
+        }
 
         // Validate the shortcut for the target implementation
         if let Err(e) =

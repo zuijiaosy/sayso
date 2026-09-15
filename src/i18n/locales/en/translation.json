@@ -700,8 +700,21 @@
     }
   },
   "overlay": {
-    "transcribing": "Transcribing...",
-    "processing": "Processing..."
+    "transcribing": "Transcribing…",
+    "processing": "Polishing…",
+    "translating": "Translating…",
+    "translateTo": "Translate to",
+    "cancel": "Cancel",
+    "confirm": "Finish",
+    "translateFailed": "Translation failed",
+    "retry": "Retry",
+    "copySource": "Copy original",
+    "dismiss": "Close",
+    "reason": {
+      "no_text_model": "Set up a text model in Settings to translate.",
+      "request_failed": "The text model could not be reached.",
+      "invalid_output": "The text model returned an unusable reply."
+    }
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",

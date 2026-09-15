@@ -1,6 +1,7 @@
 use crate::actions::ACTION_MAP;
 use crate::managers::audio::AudioRecordingManager;
 use crate::settings::ShortcutActivation;
+use crate::voice::{mode_for_binding, SessionMode};
 use log::{debug, error, warn};
 use std::sync::mpsc::{self, Sender};
 use std::sync::Arc;
@@ -10,6 +11,14 @@ use tauri::{AppHandle, Manager};
 
 const DEBOUNCE: Duration = Duration::from_millis(30);
 const RELEASE_GRACE: Duration = Duration::from_millis(50);
+/// A translate press this soon after a dictation started upgrades the session
+/// even if a tap already locked it (e.g. Fn tapped with Shift a beat late).
+const UPGRADE_WINDOW: Duration = Duration::from_millis(400);
+/// After one session shortcut stops a recording, presses of a *different*
+/// session shortcut are ignored for this long. Stopping with Fn + Left Shift
+/// delivers Fn first (which stops) and then the combo; without this the combo
+/// would be remembered and start a new recording as soon as processing ends.
+const SIBLING_SUPPRESS: Duration = Duration::from_millis(400);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PttAction {
@@ -165,13 +174,19 @@ enum Effect {
         binding_id: String,
         hotkey_string: String,
     },
+    /// The recording continues under a different mode (dictate → translate).
+    SwitchMode { mode: SessionMode },
 }
 
 /// Commands processed sequentially by the coordinator thread.
 enum Command {
     Input(InputEvent),
-    Cancel { recording_was_active: bool },
+    Cancel {
+        recording_was_active: bool,
+    },
     ProcessingFinished,
+    /// Stop and commit the active recording (overlay confirm button).
+    StopActive,
 }
 
 /// Decide whether a key-up should be deferred (so auto-repeat can cancel it)
@@ -219,9 +234,15 @@ fn classify_ptt_event(
 struct CoordinatorState {
     stage: Stage,
     hold: Option<Hold>,
-    last_press: Option<Instant>,
+    /// Last accepted physical press, per binding (debounce is per binding so a
+    /// chord like Fn then Left Shift is never swallowed as a repeat).
+    last_press: Option<(Instant, String)>,
     pending_release: Option<PendingRelease>,
     pending_press: Option<PendingPress>,
+    /// Mode of the active recording; upgraded by a translate press.
+    session_mode: SessionMode,
+    /// When and by which binding the last recording was stopped.
+    last_stop: Option<(Instant, String)>,
 }
 
 impl CoordinatorState {
@@ -232,6 +253,8 @@ impl CoordinatorState {
             last_press: None,
             pending_release: None,
             pending_press: None,
+            session_mode: SessionMode::Dictate,
+            last_stop: None,
         }
     }
 
@@ -290,18 +313,32 @@ impl CoordinatorState {
         if input.is_pressed && !input.external {
             if self
                 .last_press
-                .is_some_and(|t| now.duration_since(t) < DEBOUNCE)
+                .as_ref()
+                .is_some_and(|(t, id)| id == &input.binding_id && now.duration_since(*t) < DEBOUNCE)
             {
                 debug!("Debounced press for '{}'", input.binding_id);
                 return None;
             }
-            self.last_press = Some(now);
+            self.last_press = Some((now, input.binding_id.clone()));
         }
 
         // A busy pipeline can't accept lifecycle changes now: classify the
         // input against any already-remembered press instead of dropping it
         // silently.
         if let Stage::Processing = self.stage {
+            if input.is_pressed && !input.external {
+                if let Some((stopped_at, stopped_by)) = &self.last_stop {
+                    if stopped_by != &input.binding_id
+                        && now.duration_since(*stopped_at) < SIBLING_SUPPRESS
+                    {
+                        debug!(
+                            "Ignoring press for '{}': '{}' just stopped the recording",
+                            input.binding_id, stopped_by
+                        );
+                        return None;
+                    }
+                }
+            }
             // Only one press can be remembered. Once a binding has claimed it,
             // inputs for a different binding are ignored — the same rule as a
             // different binding pressed while recording — rather than silently
@@ -359,16 +396,49 @@ impl CoordinatorState {
                     // hold mode (the setting changed mid-recording) — otherwise
                     // nothing but Escape could stop it.
                     if self.is_locked() || input.mode == ShortcutActivation::Toggle {
-                        return Some(self.begin_processing(input.binding_id, input.hotkey_string));
+                        return Some(self.begin_processing(
+                            input.binding_id,
+                            input.hotkey_string,
+                            now,
+                        ));
                     }
                     // The key is still held (its release will end this
                     // recording), so a repeated press means nothing.
                     debug!("Ignoring press for '{}': key is held", input.binding_id);
                 }
-                _ => debug!(
-                    "Ignoring press for '{}': another binding is recording",
-                    input.binding_id
-                ),
+                Stage::Recording(recording_id) => {
+                    let recording_id = recording_id.clone();
+                    let within_upgrade_window = self.hold.as_ref().is_some_and(|h| {
+                        now.saturating_duration_since(h.pressed_at) < UPGRADE_WINDOW
+                    });
+                    // Fn held (dictation) and Left Shift added: same recording,
+                    // now translating. Only upgrades, never downgrades.
+                    if self.session_mode == SessionMode::Dictate
+                        && mode_for_binding(&input.binding_id) == SessionMode::Translate
+                        && (!self.is_locked() || within_upgrade_window)
+                    {
+                        debug!(
+                            "Upgrading recording '{}' to translate via '{}'",
+                            recording_id, input.binding_id
+                        );
+                        self.session_mode = SessionMode::Translate;
+                        return Some(Effect::SwitchMode {
+                            mode: SessionMode::Translate,
+                        });
+                    }
+                    // A locked session ends on a press of any session shortcut.
+                    // The stop targets the binding that owns the recording.
+                    if self.is_locked() || input.mode == ShortcutActivation::Toggle {
+                        return Some(self.begin_processing(recording_id, input.hotkey_string, now));
+                    }
+                    debug!(
+                        "Ignoring press for '{}': '{}' is held and recording",
+                        input.binding_id, recording_id
+                    );
+                }
+                Stage::Processing => {
+                    debug!("Ignoring press for '{}': pipeline busy", input.binding_id)
+                }
             }
         } else if hold_to_talk
             && matches!(&self.stage, Stage::Recording(id) if id == &input.binding_id)
@@ -449,13 +519,27 @@ impl CoordinatorState {
             // stopping is the safe reading (it is what push-to-talk always did).
             .unwrap_or(Duration::MAX);
         if held >= threshold {
-            return Some(self.begin_processing(binding_id, hotkey_string));
+            return Some(self.begin_processing(binding_id, hotkey_string, released_at));
         }
         if let Some(hold) = &mut self.hold {
             debug!("Tap ({held:?}) for '{binding_id}': recording locked on until the next press");
             hold.locked = true;
         }
         None
+    }
+
+    /// Overlay confirm button: stop the active recording as if its shortcut
+    /// ended it. Anything else (idle, already processing) is a no-op.
+    fn on_stop_active(&mut self, now: Instant) -> Option<Effect> {
+        let Stage::Recording(id) = &self.stage else {
+            return None;
+        };
+        let id = id.clone();
+        self.pending_release = None;
+        let effect = self.begin_processing(id, "overlay".to_string(), now);
+        // Not a key press: don't suppress a shortcut the user presses next.
+        self.last_stop = None;
+        Some(effect)
     }
 
     fn on_cancel(&mut self, recording_was_active: bool) {
@@ -509,15 +593,22 @@ impl CoordinatorState {
     ) -> Effect {
         self.stage = Stage::Recording(binding_id.clone());
         self.hold = Some(Hold { pressed_at, locked });
+        self.session_mode = mode_for_binding(&binding_id);
         Effect::Start {
             binding_id,
             hotkey_string,
         }
     }
 
-    fn begin_processing(&mut self, binding_id: String, hotkey_string: String) -> Effect {
+    fn begin_processing(
+        &mut self,
+        binding_id: String,
+        hotkey_string: String,
+        now: Instant,
+    ) -> Effect {
         self.stage = Stage::Processing;
         self.hold = None;
+        self.last_stop = Some((now, binding_id.clone()));
         Effect::Stop {
             binding_id,
             hotkey_string,
@@ -535,7 +626,7 @@ pub struct TranscriptionCoordinator {
 }
 
 pub fn is_transcribe_binding(id: &str) -> bool {
-    id == "transcribe" || id == "transcribe_with_post_process"
+    crate::voice::is_session_binding(id)
 }
 
 impl TranscriptionCoordinator {
@@ -576,6 +667,11 @@ impl TranscriptionCoordinator {
                         } => state.on_cancel(recording_was_active),
                         Command::ProcessingFinished => {
                             if let Some(effect) = state.on_processing_finished() {
+                                run_effect(&app, &mut state, effect);
+                            }
+                        }
+                        Command::StopActive => {
+                            if let Some(effect) = state.on_stop_active(Instant::now()) {
                                 run_effect(&app, &mut state, effect);
                             }
                         }
@@ -661,6 +757,13 @@ impl TranscriptionCoordinator {
         }
     }
 
+    /// Stop and commit the active recording, if any (overlay confirm button).
+    pub fn stop_active(&self) {
+        if self.tx.send(Command::StopActive).is_err() {
+            warn!("Transcription coordinator channel closed");
+        }
+    }
+
     pub fn notify_processing_finished(&self) {
         if self.tx.send(Command::ProcessingFinished).is_err() {
             warn!("Transcription coordinator channel closed");
@@ -681,6 +784,7 @@ fn run_effect(app: &AppHandle, state: &mut CoordinatorState, effect: Effect) {
             binding_id,
             hotkey_string,
         } => stop(app, &binding_id, &hotkey_string),
+        Effect::SwitchMode { mode } => crate::actions::switch_session_mode(app, mode),
     }
 }
 
@@ -920,7 +1024,7 @@ mod tests {
             match effect {
                 Some(Effect::Start { .. }) => starts += 1,
                 Some(Effect::Stop { .. }) => stops += 1,
-                None => {}
+                Some(Effect::SwitchMode { .. }) | None => {}
             }
         }
 
@@ -1613,5 +1717,157 @@ mod tests {
             "held 400ms since the real key-down: must stop, not lock"
         );
         assert_eq!(state.stage, Stage::Processing);
+    }
+
+    // ---------------------------------------------------------------------
+    // Voiceless: dictate / translate chords (Fn, then Left Shift).
+    // ---------------------------------------------------------------------
+
+    fn chord(binding_id: &str, is_pressed: bool) -> InputEvent {
+        InputEvent {
+            binding_id: binding_id.to_string(),
+            hotkey_string: binding_id.to_string(),
+            is_pressed,
+            mode: ShortcutActivation::HoldOrToggle,
+            hold_threshold: Duration::from_millis(300),
+            external: false,
+        }
+    }
+
+    const DICTATE: &str = "transcribe";
+    const TRANSLATE: &str = "translate";
+
+    #[test]
+    fn fn_then_shift_upgrades_recording_without_stopping() {
+        let mut state = CoordinatorState::new();
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+
+        assert!(matches!(
+            state.on_input(chord(DICTATE, true), t0),
+            Some(Effect::Start { .. })
+        ));
+        assert_eq!(
+            state.on_input(chord(TRANSLATE, true), at(80)),
+            Some(Effect::SwitchMode {
+                mode: SessionMode::Translate
+            })
+        );
+        assert_eq!(state.stage, Stage::Recording(DICTATE.to_string()));
+        // Releasing the combo first does not stop; releasing Fn after a hold does.
+        assert!(state.on_input(chord(TRANSLATE, false), at(900)).is_none());
+        assert!(state.on_input(chord(DICTATE, false), at(1000)).is_none());
+        match state.on_grace_expired() {
+            Some(Effect::Stop { binding_id, .. }) => assert_eq!(binding_id, DICTATE),
+            other => panic!("expected Stop for the recording binding, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn near_simultaneous_chord_is_not_debounced() {
+        let mut state = CoordinatorState::new();
+        let t0 = Instant::now();
+        state.on_input(chord(DICTATE, true), t0);
+        assert_eq!(
+            state.on_input(chord(TRANSLATE, true), t0 + Duration::from_millis(5)),
+            Some(Effect::SwitchMode {
+                mode: SessionMode::Translate
+            })
+        );
+    }
+
+    #[test]
+    fn shift_first_starts_translate_directly() {
+        let mut state = CoordinatorState::new();
+        match state.on_input(chord(TRANSLATE, true), Instant::now()) {
+            Some(Effect::Start { binding_id, .. }) => assert_eq!(binding_id, TRANSLATE),
+            other => panic!("expected Start, got {other:?}"),
+        }
+        assert_eq!(state.session_mode, SessionMode::Translate);
+    }
+
+    #[test]
+    fn translate_press_never_downgrades_or_stops_a_held_translation() {
+        let mut state = CoordinatorState::new();
+        let t0 = Instant::now();
+        state.on_input(chord(TRANSLATE, true), t0);
+        assert!(state
+            .on_input(chord(DICTATE, true), t0 + Duration::from_millis(500))
+            .is_none());
+        assert_eq!(state.session_mode, SessionMode::Translate);
+        assert_eq!(state.stage, Stage::Recording(TRANSLATE.to_string()));
+    }
+
+    #[test]
+    fn stopping_a_locked_session_with_the_combo_does_not_restart_it() {
+        let mut state = CoordinatorState::new();
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+
+        // Quick Fn + Shift tap: starts, upgrades, locks on.
+        state.on_input(chord(DICTATE, true), t0);
+        state.on_input(chord(TRANSLATE, true), at(40));
+        assert!(state.on_input(chord(TRANSLATE, false), at(120)).is_none());
+        assert!(state.on_input(chord(DICTATE, false), at(150)).is_none());
+        assert!(state.on_grace_expired().is_none());
+        assert!(state.is_locked());
+
+        // Pressing the combo again: Fn arrives first and stops ...
+        assert!(matches!(
+            state.on_input(chord(DICTATE, true), at(3000)),
+            Some(Effect::Stop { .. })
+        ));
+        // ... and the combo edge right after is not remembered as a new start.
+        assert!(state.on_input(chord(TRANSLATE, true), at(3030)).is_none());
+        assert!(state.on_processing_finished().is_none());
+        assert_eq!(state.stage, Stage::Idle);
+    }
+
+    #[test]
+    fn locked_dictation_is_stopped_by_translate_combo_after_upgrade_window() {
+        let mut state = CoordinatorState::new();
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        state.on_input(chord(DICTATE, true), t0);
+        state.on_input(chord(DICTATE, false), at(100));
+        assert!(state.on_grace_expired().is_none());
+        match state.on_input(chord(TRANSLATE, true), at(2000)) {
+            Some(Effect::Stop { binding_id, .. }) => assert_eq!(binding_id, DICTATE),
+            other => panic!("expected Stop, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn late_shift_after_a_tap_still_upgrades_inside_window() {
+        let mut state = CoordinatorState::new();
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        state.on_input(chord(DICTATE, true), t0);
+        state.on_input(chord(DICTATE, false), at(100));
+        assert!(state.on_grace_expired().is_none());
+        assert_eq!(
+            state.on_input(chord(TRANSLATE, true), at(300)),
+            Some(Effect::SwitchMode {
+                mode: SessionMode::Translate
+            })
+        );
+    }
+
+    #[test]
+    fn stop_active_commits_recording_and_is_noop_otherwise() {
+        let mut state = CoordinatorState::new();
+        let t0 = Instant::now();
+        assert!(state.on_stop_active(t0).is_none());
+        state.on_input(chord(DICTATE, true), t0);
+        match state.on_stop_active(t0 + Duration::from_millis(500)) {
+            Some(Effect::Stop { binding_id, .. }) => assert_eq!(binding_id, DICTATE),
+            other => panic!("expected Stop, got {other:?}"),
+        }
+        assert_eq!(state.stage, Stage::Processing);
+        assert!(state
+            .on_stop_active(t0 + Duration::from_millis(600))
+            .is_none());
+        // A confirm click must not suppress the next shortcut press.
+        assert!(state.last_stop.is_none());
     }
 }

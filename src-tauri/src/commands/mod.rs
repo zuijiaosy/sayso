@@ -3,6 +3,7 @@ pub mod history;
 pub mod models;
 pub mod system;
 pub mod transcription;
+pub mod voice;
 
 use crate::settings::{
     get_settings, update_checks_forced_disabled, write_settings, AppSettings, LogLevel,

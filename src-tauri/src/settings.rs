@@ -248,6 +248,35 @@ impl ModelUnloadTimeout {
     }
 }
 
+/// What the text model does to a dictation (translation always uses the model).
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DictationPostMode {
+    /// Paste the recognized text as-is (after dictionary replacements).
+    Off,
+    /// Fix homophones, sentence breaks and punctuation only.
+    Fix,
+    /// Also remove fillers and smooth self-corrections, without changing meaning.
+    #[default]
+    Polish,
+}
+
+/// One custom dictionary entry.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Type, Default)]
+pub struct DictionaryEntry {
+    /// The spelling that should appear in the output, e.g. `Codex`.
+    pub term: String,
+    /// Known misrecognitions that are replaced literally with `term`.
+    #[serde(default)]
+    pub aliases: Vec<String>,
+    /// Fixed translation used by translate mode.
+    #[serde(default)]
+    pub translation: Option<String>,
+    /// Short hint that helps the text model understand the term.
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum SoundTheme {
@@ -514,13 +543,26 @@ pub struct AppSettings {
     /// `overlay_position` (position `none` → style `None`).
     #[serde(default = "default_overlay_style")]
     pub overlay_style: OverlayStyle,
+    /// Voiceless: how dictation text is post-processed by the text model.
+    #[serde(default)]
+    pub dictation_post_mode: DictationPostMode,
+    /// Voiceless: BCP 47 code of the translation target, e.g. `en-US`.
+    #[serde(default = "default_translate_target_language")]
+    pub translate_target_language: String,
+    /// Voiceless: custom dictionary.
+    #[serde(default)]
+    pub dictionary: Vec<DictionaryEntry>,
+}
+
+fn default_translate_target_language() -> String {
+    crate::voice::DEFAULT_TRANSLATE_TARGET.to_string()
 }
 
 fn default_model() -> String {
     "".to_string()
 }
 
-const CURRENT_SETTINGS_SCHEMA_VERSION: u32 = 2;
+const CURRENT_SETTINGS_SCHEMA_VERSION: u32 = 3;
 
 fn default_settings_schema_version() -> u32 {
     CURRENT_SETTINGS_SCHEMA_VERSION
@@ -572,12 +614,12 @@ fn default_overlay_position() -> OverlayPosition {
 }
 
 fn default_overlay_style() -> OverlayStyle {
-    // Linux hides the overlay by default; other platforms show the live overlay.
-    // Position is independent and only selects top vs. bottom placement.
+    // Linux hides the overlay by default. Voiceless uses the compact capsule
+    // elsewhere (its default model does not stream live text).
     #[cfg(target_os = "linux")]
     return OverlayStyle::None;
     #[cfg(not(target_os = "linux"))]
-    return OverlayStyle::Live;
+    return OverlayStyle::Minimal;
 }
 
 fn default_vad_enabled() -> bool {
@@ -646,12 +688,31 @@ fn default_show_tray_icon() -> bool {
     true
 }
 
+pub const DEEPSEEK_PROVIDER_ID: &str = "deepseek";
+pub const DASHSCOPE_PROVIDER_ID: &str = "dashscope";
+
 fn default_post_process_provider_id() -> String {
-    "openai".to_string()
+    DEEPSEEK_PROVIDER_ID.to_string()
 }
 
 fn default_post_process_providers() -> Vec<PostProcessProvider> {
     let mut providers = vec![
+        PostProcessProvider {
+            id: DEEPSEEK_PROVIDER_ID.to_string(),
+            label: "DeepSeek".to_string(),
+            base_url: "https://api.deepseek.com".to_string(),
+            allow_base_url_edit: false,
+            models_endpoint: Some("/models".to_string()),
+            supports_structured_output: false,
+        },
+        PostProcessProvider {
+            id: DASHSCOPE_PROVIDER_ID.to_string(),
+            label: "阿里云百炼 (DashScope)".to_string(),
+            base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1".to_string(),
+            allow_base_url_edit: true,
+            models_endpoint: Some("/models".to_string()),
+            supports_structured_output: false,
+        },
         PostProcessProvider {
             id: "openai".to_string(),
             label: "OpenAI".to_string(),
@@ -752,6 +813,9 @@ fn default_post_process_api_keys() -> SecretMap {
 fn default_model_for_provider(provider_id: &str) -> String {
     if provider_id == APPLE_INTELLIGENCE_PROVIDER_ID {
         return APPLE_INTELLIGENCE_DEFAULT_MODEL_ID.to_string();
+    }
+    if provider_id == DEEPSEEK_PROVIDER_ID {
+        return "deepseek-flash".to_string();
     }
     String::new()
 }
@@ -859,55 +923,60 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
 pub const SETTINGS_STORE_PATH: &str = "settings_store.json";
 
 pub fn get_default_settings() -> AppSettings {
-    #[cfg(target_os = "windows")]
-    let default_shortcut = "ctrl+space";
+    // Voiceless defaults: Fn dictates, Fn + Left Shift translates (Apple
+    // keyboards only; see README). The `_alt` bindings are optional second
+    // shortcuts ("add another") and start unset.
     #[cfg(target_os = "macos")]
-    let default_shortcut = "option+space";
+    let (default_dictate, default_translate) = ("fn", "fn+shift_left");
+    #[cfg(target_os = "windows")]
+    let (default_dictate, default_translate) = ("ctrl+space", "ctrl+shift+space");
     #[cfg(target_os = "linux")]
-    let default_shortcut = "ctrl+space";
+    let (default_dictate, default_translate) = ("ctrl+space", "ctrl+shift+space");
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    let default_shortcut = "alt+space";
+    let (default_dictate, default_translate) = ("alt+space", "alt+shift+space");
 
     let mut bindings = HashMap::new();
-    bindings.insert(
-        "transcribe".to_string(),
-        ShortcutBinding {
-            id: "transcribe".to_string(),
-            name: "Transcribe".to_string(),
-            description: "Converts your speech into text.".to_string(),
-            default_binding: default_shortcut.to_string(),
-            current_binding: default_shortcut.to_string(),
-        },
+    let mut add = |id: &str, name: &str, description: &str, binding: &str| {
+        bindings.insert(
+            id.to_string(),
+            ShortcutBinding {
+                id: id.to_string(),
+                name: name.to_string(),
+                description: description.to_string(),
+                default_binding: binding.to_string(),
+                current_binding: binding.to_string(),
+            },
+        );
+    };
+    add(
+        crate::voice::BINDING_DICTATE,
+        "Dictate",
+        "Press to start and stop voice input.",
+        default_dictate,
     );
-    #[cfg(target_os = "windows")]
-    let default_post_process_shortcut = "ctrl+shift+space";
-    #[cfg(target_os = "macos")]
-    let default_post_process_shortcut = "option+shift+space";
-    #[cfg(target_os = "linux")]
-    let default_post_process_shortcut = "ctrl+shift+space";
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    let default_post_process_shortcut = "alt+shift+space";
-
-    bindings.insert(
-        "transcribe_with_post_process".to_string(),
-        ShortcutBinding {
-            id: "transcribe_with_post_process".to_string(),
-            name: "Transcribe with Post-Processing".to_string(),
-            description: "Converts your speech into text and applies AI post-processing."
-                .to_string(),
-            default_binding: default_post_process_shortcut.to_string(),
-            current_binding: default_post_process_shortcut.to_string(),
-        },
+    add(
+        crate::voice::BINDING_DICTATE_ALT,
+        "Dictate (another shortcut)",
+        "An optional second shortcut for voice input.",
+        "",
     );
-    bindings.insert(
-        "cancel".to_string(),
-        ShortcutBinding {
-            id: "cancel".to_string(),
-            name: "Cancel".to_string(),
-            description: "Cancels the current recording.".to_string(),
-            default_binding: "escape".to_string(),
-            current_binding: "escape".to_string(),
-        },
+    add(
+        crate::voice::BINDING_TRANSLATE,
+        "Translate",
+        "Press to start and stop translation.",
+        default_translate,
+    );
+    add(
+        crate::voice::BINDING_TRANSLATE_ALT,
+        "Translate (another shortcut)",
+        "An optional second shortcut for translation.",
+        "",
+    );
+    add(
+        "cancel",
+        "Cancel",
+        "Cancels the current recording.",
+        "escape",
     );
 
     AppSettings {
@@ -975,6 +1044,9 @@ pub fn get_default_settings() -> AppSettings {
         vad_enabled: default_vad_enabled(),
         vad_backend: VadBackend::default(),
         overlay_style: default_overlay_style(),
+        dictation_post_mode: DictationPostMode::default(),
+        translate_target_language: default_translate_target_language(),
+        dictionary: Vec::new(),
     }
 }
 
@@ -1156,6 +1228,21 @@ fn apply_settings_migrations(
             settings.transcribe_accelerator = TranscribeAcceleratorSetting::Auto;
         }
     }
+    if stored_schema_version < 3 {
+        // Voiceless replaces upstream's post-process shortcut with separate
+        // dictate/translate bindings; the post-process mode is a setting now.
+        if settings
+            .bindings
+            .remove(crate::voice::BINDING_LEGACY_POST_PROCESS)
+            .is_some()
+        {
+            updated = true;
+        }
+        if settings.settings_schema_version < 3 {
+            settings.settings_schema_version = CURRENT_SETTINGS_SCHEMA_VERSION;
+            updated = true;
+        }
+    }
     if stored_schema_version < 2 {
         // transcribe.cpp 0.2 replaced integer registry indices with opaque
         // process-local handles. Clear every old index once.
@@ -1230,11 +1317,17 @@ pub fn get_bindings(app: &AppHandle) -> HashMap<String, ShortcutBinding> {
 }
 
 pub fn get_stored_binding(app: &AppHandle, id: &str) -> ShortcutBinding {
-    let bindings = get_bindings(app);
-
-    let binding = bindings.get(id).unwrap().clone();
-
-    binding
+    get_bindings(app)
+        .get(id)
+        .cloned()
+        .or_else(|| get_default_settings().bindings.get(id).cloned())
+        .unwrap_or_else(|| ShortcutBinding {
+            id: id.to_string(),
+            name: id.to_string(),
+            description: String::new(),
+            default_binding: String::new(),
+            current_binding: String::new(),
+        })
 }
 
 pub fn get_history_limit(app: &AppHandle) -> usize {
@@ -1514,9 +1607,59 @@ mod tests {
 
     #[cfg(not(target_os = "linux"))]
     #[test]
-    fn default_overlay_style_is_live_when_overlay_defaults_on() {
+    fn default_overlay_style_is_compact_capsule() {
+        // Voiceless shows the compact capsule by default.
         let settings = get_default_settings();
-        assert_eq!(settings.overlay_style, OverlayStyle::Live);
+        assert_eq!(settings.overlay_style, OverlayStyle::Minimal);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn voiceless_default_bindings_and_text_model() {
+        let settings = get_default_settings();
+        assert_eq!(settings.bindings["transcribe"].current_binding, "fn");
+        assert_eq!(
+            settings.bindings["translate"].current_binding,
+            "fn+shift_left"
+        );
+        assert_eq!(settings.bindings["transcribe_alt"].current_binding, "");
+        assert_eq!(settings.bindings["translate_alt"].current_binding, "");
+        assert!(!settings
+            .bindings
+            .contains_key("transcribe_with_post_process"));
+        assert_eq!(settings.post_process_provider_id, DEEPSEEK_PROVIDER_ID);
+        assert_eq!(
+            settings.post_process_models[DEEPSEEK_PROVIDER_ID],
+            "deepseek-flash"
+        );
+        assert_eq!(settings.dictation_post_mode, DictationPostMode::Polish);
+        assert_eq!(settings.translate_target_language, "en-US");
+        assert!(settings.reliable_paste);
+        assert!(settings.start_hidden);
+    }
+
+    #[test]
+    fn schema_v3_migration_drops_legacy_post_process_binding() {
+        let mut settings = get_default_settings();
+        settings.bindings.insert(
+            "transcribe_with_post_process".into(),
+            ShortcutBinding {
+                id: "transcribe_with_post_process".into(),
+                name: "x".into(),
+                description: "x".into(),
+                default_binding: "option+shift+space".into(),
+                current_binding: "option+shift+space".into(),
+            },
+        );
+        let raw = serde_json::json!({ "settings_schema_version": 2, "overlay_style": "minimal" });
+        assert!(apply_settings_migrations(&mut settings, &raw));
+        assert!(!settings
+            .bindings
+            .contains_key("transcribe_with_post_process"));
+        assert_eq!(
+            settings.settings_schema_version,
+            CURRENT_SETTINGS_SCHEMA_VERSION
+        );
     }
 
     #[test]

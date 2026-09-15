@@ -93,15 +93,22 @@ pub async fn retry_history_entry_transcription(
         return Err("Recording contains no speech".to_string());
     }
 
-    let processed =
-        process_transcription_output(&app, &transcription, entry.post_process_requested).await;
+    // History does not record the session mode; a retry re-runs dictation.
+    let _ = entry.post_process_requested;
+    let target = crate::settings::get_settings(&app).translate_target_language;
+    let (post_processed_text, post_process_prompt) = match process_transcription_output(
+        &app,
+        &transcription,
+        crate::voice::SessionMode::Dictate,
+        &target,
+    )
+    .await
+    {
+        Ok(processed) => (processed.post_processed_text, processed.post_process_prompt),
+        Err(_) => (None, None),
+    };
     history_manager
-        .update_transcription(
-            id,
-            transcription,
-            processed.post_processed_text,
-            processed.post_process_prompt,
-        )
+        .update_transcription(id, transcription, post_processed_text, post_process_prompt)
         .map(|_| ())
         .map_err(|e| e.to_string())
 }

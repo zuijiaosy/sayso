@@ -24,6 +24,7 @@ mod transcription_coordinator;
 mod tray;
 mod tray_i18n;
 mod utils;
+mod voice;
 
 pub use cli::CliArgs;
 #[cfg(debug_assertions)]
@@ -653,6 +654,7 @@ pub fn run(cli_args: CliArgs) {
         .commands(collect_commands![
             shortcut::change_binding,
             shortcut::reset_binding,
+            shortcut::clear_binding,
             shortcut::change_shortcut_activation_setting,
             shortcut::change_hold_threshold_ms_setting,
             shortcut::change_audio_feedback_setting,
@@ -720,6 +722,16 @@ pub fn run(cli_args: CliArgs) {
             commands::is_update_checks_locked,
             commands::system::get_fn_key_usage,
             commands::system::open_system_settings_pane,
+            commands::voice::stop_active_recording,
+            commands::voice::list_translate_targets,
+            commands::voice::set_session_translate_target,
+            commands::voice::get_voice_session,
+            commands::voice::retry_failed_translation,
+            commands::voice::copy_failed_translation_source,
+            commands::voice::dismiss_translation_failure,
+            commands::voice::set_overlay_picker_open,
+            commands::voice::update_dictation_post_mode,
+            commands::voice::update_dictionary,
             commands::get_app_dir_path,
             commands::get_app_settings,
             commands::get_default_settings,
@@ -774,6 +786,8 @@ pub fn run(cli_args: CliArgs) {
             managers::history::HistoryUpdatePayload,
             managers::transcription::StreamTextEvent,
             managers::transcription::StreamPhaseEvent,
+            voice::SessionModeEvent,
+            voice::TranslationFailedEvent,
         ]);
 
     #[cfg(debug_assertions)] // <- Only export on non-release builds
@@ -1009,6 +1023,9 @@ pub fn run(cli_args: CliArgs) {
             // honors the runtime `--debug` override applied to `settings` above.
             WEBVIEW_LOG_STREAMING.store(settings.debug_mode, Ordering::Relaxed);
             let app_handle = app.handle().clone();
+            app.manage(voice::VoiceSessionState::new(
+                settings.translate_target_language.clone(),
+            ));
             app.manage(TranscriptionCoordinator::new(app_handle.clone()));
 
             initialize_core_logic(&app_handle);

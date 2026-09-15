@@ -46,11 +46,17 @@ struct ReasoningParams {
     reasoning: Option<ReasoningConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     thinking: Option<Value>,
+    /// Alibaba DashScope (Qwen3 family) uses its own boolean switch.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    enable_thinking: Option<bool>,
 }
 
 impl ReasoningParams {
     fn is_empty(&self) -> bool {
-        self.reasoning_effort.is_none() && self.reasoning.is_none() && self.thinking.is_none()
+        self.reasoning_effort.is_none()
+            && self.reasoning.is_none()
+            && self.thinking.is_none()
+            && self.enable_thinking.is_none()
     }
 }
 
@@ -64,6 +70,12 @@ fn reasoning_disable_params(provider: &PostProcessProvider) -> ReasoningParams {
         // https://api-docs.deepseek.com/guides/thinking_mode
         ReasoningParams {
             thinking: Some(serde_json::json!({ "type": "disabled" })),
+            ..Default::default()
+        }
+    } else if base_url.contains("dashscope") {
+        // https://help.aliyun.com/zh/model-studio/deep-thinking
+        ReasoningParams {
+            enable_thinking: Some(false),
             ..Default::default()
         }
     } else if provider.id == "openrouter" {
@@ -170,6 +182,8 @@ fn create_client(provider: &PostProcessProvider, api_key: &str) -> Result<reqwes
     let headers = build_headers(provider, api_key)?;
     reqwest::Client::builder()
         .default_headers(headers)
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(60))
         .build()
         .map_err(|e| report_reqwest_error("Failed to build HTTP client", &e))
 }
@@ -290,6 +304,7 @@ fn report_reqwest_error(context: &str, error: &reqwest::Error) -> String {
 /// Send a chat completion request to an OpenAI-compatible API
 /// Returns Ok(Some(content)) on success, Ok(None) if response has no content,
 /// or Err on actual errors (HTTP, parsing, etc.)
+#[allow(dead_code)] // upstream API; Voiceless always sends a system prompt
 pub async fn send_chat_completion(
     provider: &PostProcessProvider,
     api_key: String,
@@ -696,6 +711,27 @@ mod tests {
         assert!(json.get("reasoning_effort").is_none());
         assert!(json.get("reasoning").is_none());
         assert_eq!(json["thinking"]["type"], "disabled");
+    }
+
+    #[test]
+    fn deepseek_provider_disables_thinking_and_sends_no_other_fields() {
+        let params = reasoning_disable_params(&provider("deepseek", "https://api.deepseek.com"));
+        let json = request_json(params);
+        assert_eq!(json["thinking"]["type"], "disabled");
+        assert!(json.get("enable_thinking").is_none());
+        assert!(json.get("reasoning_effort").is_none());
+    }
+
+    #[test]
+    fn dashscope_base_url_uses_enable_thinking_false() {
+        let params = reasoning_disable_params(&provider(
+            "dashscope",
+            "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        ));
+        let json = request_json(params);
+        assert_eq!(json["enable_thinking"], false);
+        assert!(json.get("reasoning_effort").is_none());
+        assert!(json.get("thinking").is_none());
     }
 
     #[test]

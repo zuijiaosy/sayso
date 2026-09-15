@@ -697,8 +697,21 @@
     }
   },
   "overlay": {
-    "transcribing": "正在转录...",
-    "processing": "处理中..."
+    "transcribing": "识别中…",
+    "processing": "整理中…",
+    "translating": "翻译中…",
+    "translateTo": "翻译为",
+    "cancel": "取消",
+    "confirm": "完成",
+    "translateFailed": "翻译失败",
+    "retry": "重试",
+    "copySource": "复制原文",
+    "dismiss": "关闭",
+    "reason": {
+      "no_text_model": "请先在设置中配置文本模型。",
+      "request_failed": "无法连接文本模型。",
+      "invalid_output": "文本模型返回的内容无法使用。"
+    }
   },
   "whatsNew": {
     "title": "Handy v{{version}} 新功能"
