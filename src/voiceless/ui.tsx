@@ -3,16 +3,41 @@ import React from "react";
 export const Page: React.FC<{
   title: string;
   description?: string;
+  /**
+   * Fill the window rather than growing past it: the title stays put and the
+   * children own the scrolling. For pages built around one long list (History,
+   * Dictionary), where scrolling the whole page would drag the heading and the
+   * search box off-screen. Everything else scrolls as a single unit.
+   */
+  fill?: boolean;
   children: React.ReactNode;
-}> = ({ title, description, children }) => (
-  <div className="w-full max-w-[680px] mx-auto px-8 pt-6 pb-14">
-    <h1 className="font-display text-[30px] leading-10 font-semibold">
-      {title}
-    </h1>
-    {description && (
-      <p className="text-sm text-muted mt-2 leading-relaxed">{description}</p>
-    )}
-    <div className="mt-6 flex flex-col gap-6">{children}</div>
+}> = ({ title, description, fill = false, children }) => (
+  // The scroll container is full-width so the scrollbar sits at the window
+  // edge, not against the 680px column.
+  <div
+    className={
+      fill
+        ? "flex-1 min-h-0 flex flex-col"
+        : "flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]"
+    }
+  >
+    <div
+      className={`w-full max-w-[680px] mx-auto px-8 pt-6 ${
+        fill ? "pb-6 flex-1 min-h-0 flex flex-col" : "pb-14"
+      }`}
+    >
+      <h1 className="font-display text-[30px] leading-10 font-semibold">
+        {title}
+      </h1>
+      {description && (
+        <p className="text-sm text-muted mt-2 leading-relaxed">{description}</p>
+      )}
+      <div
+        className={`mt-6 flex flex-col gap-6 ${fill ? "flex-1 min-h-0" : ""}`}
+      >
+        {children}
+      </div>
+    </div>
   </div>
 );
 
@@ -27,11 +52,27 @@ export const Section: React.FC<{
   title?: string;
   description?: string;
   actions?: React.ReactNode;
+  /** Pinned between the header and the rows — a search box and the like. */
+  toolbar?: React.ReactNode;
+  /** Fill the parent and scroll the rows, keeping header and toolbar in view. */
+  fill?: boolean;
   children: React.ReactNode;
-}> = ({ icon, title, description, actions, children }) => (
-  <section className="bg-surface rounded-card shadow-card px-5">
+}> = ({
+  icon,
+  title,
+  description,
+  actions,
+  toolbar,
+  fill = false,
+  children,
+}) => (
+  <section
+    className={`bg-surface rounded-card shadow-card px-5 ${
+      fill ? "flex-1 min-h-0 flex flex-col" : ""
+    }`}
+  >
     {title && (
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pt-4 pb-3 border-b border-border">
+      <div className="shrink-0 flex flex-wrap items-center gap-x-2.5 gap-y-2 pt-4 pb-3 border-b border-border">
         {icon && <span className="text-accent shrink-0">{icon}</span>}
         <div className="flex-1 min-w-0">
           <h2 className="text-[16px] leading-6 font-semibold tracking-tight">
@@ -48,7 +89,18 @@ export const Section: React.FC<{
         )}
       </div>
     )}
-    <div className="divide-y divide-border">{children}</div>
+    {toolbar && (
+      <div className="shrink-0 divide-y divide-border border-b border-border">
+        {toolbar}
+      </div>
+    )}
+    <div
+      className={`divide-y divide-border ${
+        fill ? "flex-1 min-h-0 overflow-y-auto" : ""
+      }`}
+    >
+      {children}
+    </div>
   </section>
 );
 
@@ -146,6 +198,62 @@ export function Segmented<T extends string>({
         </button>
       ))}
     </div>
+  );
+}
+
+export interface TabDef<T extends string> {
+  value: T;
+  label: string;
+  icon?: React.ReactNode;
+  /** Explains the active tab; shown under the switcher. */
+  description?: string;
+}
+
+/**
+ * One card whose body switches between several forms, for pages that would
+ * otherwise stack a full-height card per topic. The caller renders the body
+ * for `value`; this only draws the pinned switcher.
+ */
+export function TabbedSection<T extends string>({
+  tabs,
+  value,
+  onChange,
+  fill,
+  children,
+}: {
+  tabs: TabDef<T>[];
+  value: T;
+  onChange: (value: T) => void;
+  fill?: boolean;
+  children: React.ReactNode;
+}) {
+  const active = tabs.find((tab) => tab.value === value);
+
+  return (
+    <Section
+      fill={fill}
+      toolbar={
+        <div className="py-3 flex flex-col gap-2">
+          <div className="flex items-center gap-2.5">
+            {active?.icon && (
+              <span className="text-accent shrink-0">{active.icon}</span>
+            )}
+            <Segmented<T>
+              value={value}
+              onChange={onChange}
+              options={tabs.map(({ value, label }) => ({ value, label }))}
+            />
+          </div>
+          {active?.description && (
+            <p className="text-xs text-muted leading-relaxed">
+              {active.description}
+            </p>
+          )}
+        </div>
+      }
+    >
+      {children}
+    </Section>
   );
 }
 

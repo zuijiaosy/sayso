@@ -222,9 +222,9 @@ export const HistoryPage: React.FC = () => {
   }, [entries, dayLabel]);
 
   return (
-    <Page title={t("voiceless.nav.history")}>
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+    <Page title={t("voiceless.nav.history")} fill>
+      <div className="flex-1 min-h-0 flex flex-col gap-5">
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-3">
           <Segmented<Filter>
             value={filter}
             onChange={setFilter}
@@ -252,45 +252,51 @@ export const HistoryPage: React.FC = () => {
           </div>
         </div>
 
-        {groups.length === 0 && !loading && (
-          <p className="py-8 text-center text-[13px] text-muted">
-            {search
-              ? t("voiceless.history.noResults")
-              : t("voiceless.history.empty")}
-          </p>
-        )}
+        {/* Only the entries scroll; the filter row above stays put. The
+            negative margin lets the cards' shadows bleed past the clip edge. */}
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-5 -mx-1 px-1">
+          {groups.length === 0 && !loading && (
+            <p className="py-8 text-center text-[13px] text-muted">
+              {search
+                ? t("voiceless.history.noResults")
+                : t("voiceless.history.empty")}
+            </p>
+          )}
 
-        {groups.map((group) => (
-          <section key={group.key}>
-            <h2 className="pb-1.5 text-[12px] font-semibold text-muted">
-              {group.label}
-            </h2>
-            <div className="bg-surface rounded-card shadow-card px-4 divide-y divide-border">
-              {group.items.map((entry) => (
-                <EntryRow
-                  key={entry.id}
-                  entry={entry}
-                  showMode={filter === "all"}
-                />
-              ))}
+          {groups.map((group) => (
+            <section key={group.key}>
+              <h2 className="pb-1.5 text-[12px] font-semibold text-muted">
+                {group.label}
+              </h2>
+              <div className="bg-surface rounded-card shadow-card px-4 divide-y divide-border">
+                {group.items.map((entry) => (
+                  <EntryRow
+                    key={entry.id}
+                    entry={entry}
+                    showMode={filter === "all"}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+
+          {hasMore && (
+            <div className="flex justify-center">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={loading}
+                onClick={() =>
+                  void load(entries[entries.length - 1]?.id ?? null)
+                }
+              >
+                {loading
+                  ? t("voiceless.common.loading")
+                  : t("voiceless.common.loadMore")}
+              </Button>
             </div>
-          </section>
-        ))}
-
-        {hasMore && (
-          <div className="flex justify-center">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={loading}
-              onClick={() => void load(entries[entries.length - 1]?.id ?? null)}
-            >
-              {loading
-                ? t("voiceless.common.loading")
-                : t("voiceless.common.loadMore")}
-            </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </Page>
   );

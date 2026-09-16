@@ -988,8 +988,11 @@ pub fn run(cli_args: CliArgs) {
             let mut win_builder =
                 tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
                     .title("Sayso")
-                    .inner_size(720.0, 600.0)
-                    .min_inner_size(680.0, 570.0)
+                    // Wide enough for the 184px sidebar plus the 680px content
+                    // column and its 32px gutters (928px) with room to spare,
+                    // and tall enough that a page fits without scrolling.
+                    .inner_size(1000.0, 780.0)
+                    .min_inner_size(820.0, 600.0)
                     .resizable(true)
                     .maximizable(true)
                     .visible(false);

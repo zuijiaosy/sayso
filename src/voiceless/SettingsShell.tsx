@@ -86,11 +86,14 @@ export const SettingsShell: React.FC<{
           {t("voiceless.nav.settings")}
         </button>
       </nav>
-      <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
+      {/* The window itself never scrolls: this column is clipped to the window
+          and each page decides what scrolls inside it (see Page's `fill`), so a
+          long list moves under a heading that stays put. */}
+      <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {/* Matches the sidebar's traffic-light inset and lets the window be
             dragged from the empty strip above the page title. */}
-        <div data-tauri-drag-region className="titlebar-strip" />
-        <div className="w-full max-w-[680px] mx-auto px-8">
+        <div data-tauri-drag-region className="titlebar-strip shrink-0" />
+        <div className="shrink-0 w-full max-w-[680px] mx-auto px-8">
           <SecureInputWarning />
         </div>
         <Active />

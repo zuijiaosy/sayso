@@ -2,13 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
-import {
-  AudioLines,
-  Cloud,
-  FolderOpen,
-  RefreshCw,
-  Sparkles,
-} from "lucide-react";
+import { AudioLines, FolderOpen, RefreshCw, Sparkles } from "lucide-react";
 import {
   commands,
   type AsrProviderKind,
@@ -27,11 +21,11 @@ import {
   Notice,
   Page,
   Row,
-  Section,
   Segmented,
   SelectInput,
   StatusPill,
   Switch,
+  TabbedSection,
   TextInput,
 } from "../ui";
 
@@ -475,7 +469,7 @@ const HotwordVendorForm: React.FC<{
   );
 };
 
-const CloudAsrSection: React.FC = () => {
+const CloudAsrBody: React.FC = () => {
   const { t } = useTranslation();
   const { settings, refreshSettings } = useSettings();
   const vendor: CloudAsrProvider = settings?.cloud_asr_provider ?? "stepfun";
@@ -498,10 +492,7 @@ const CloudAsrSection: React.FC = () => {
   };
 
   return (
-    <Section
-      icon={<Cloud size={20} />}
-      title={t("voiceless.models.cloud.title")}
-    >
+    <>
       <Row title={t("voiceless.models.cloud.vendor")}>
         <SelectInput
           value={vendor}
@@ -542,11 +533,11 @@ const CloudAsrSection: React.FC = () => {
           {testing ? t("voiceless.common.testing") : t("voiceless.common.test")}
         </Button>
       </div>
-    </Section>
+    </>
   );
 };
 
-const TextModelSection: React.FC = () => {
+const TextModelBody: React.FC = () => {
   const { t } = useTranslation();
   const {
     settings,
@@ -596,11 +587,7 @@ const TextModelSection: React.FC = () => {
   };
 
   return (
-    <Section
-      icon={<Sparkles size={20} />}
-      title={t("voiceless.models.text.title")}
-      description={t("voiceless.models.text.description")}
-    >
+    <>
       {!configured && (
         <div className="pt-4">
           <Notice tone="info">
@@ -708,14 +695,20 @@ const TextModelSection: React.FC = () => {
           ]}
         />
       </Row>
-    </Section>
+    </>
   );
 };
+
+type ModelsTab = "asr" | "text";
 
 export const ModelsPage: React.FC = () => {
   const { t } = useTranslation();
   const { settings, refreshSettings } = useSettings();
   const initializeModels = useModelStore((s) => s.initialize);
+  // Speech recognition and the text model are separate forms that each ran
+  // well past the window as stacked cards; only one is edited at a time, so
+  // they share one card and a tab picks between them.
+  const [tab, setTab] = useState<ModelsTab>("asr");
   useEffect(() => {
     void initializeModels();
   }, [initializeModels]);
@@ -733,32 +726,49 @@ export const ModelsPage: React.FC = () => {
 
   return (
     <Page title={t("voiceless.models.title")}>
-      <Section
-        icon={<AudioLines size={20} />}
-        title={t("voiceless.models.asr.title")}
-        description={t("voiceless.models.asr.description")}
+      <TabbedSection<ModelsTab>
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          {
+            value: "asr",
+            label: t("voiceless.models.asr.title"),
+            icon: <AudioLines size={20} />,
+            description: t("voiceless.models.asr.description"),
+          },
+          {
+            value: "text",
+            label: t("voiceless.models.text.title"),
+            icon: <Sparkles size={20} />,
+            description: t("voiceless.models.text.description"),
+          },
+        ]}
       >
-        <Row
-          title={t("voiceless.models.asr.mode")}
-          description={
-            provider === "local"
-              ? t("voiceless.models.asr.localDesc")
-              : t("voiceless.models.asr.cloudDesc")
-          }
-        >
-          <Segmented<AsrProviderKind>
-            value={provider}
-            onChange={(value) => void switchProvider(value)}
-            options={[
-              { value: "local", label: t("voiceless.models.asr.local") },
-              { value: "cloud", label: t("voiceless.models.asr.cloud") },
-            ]}
-          />
-        </Row>
-        {provider === "local" ? <LocalModels /> : null}
-      </Section>
-      {provider === "cloud" && <CloudAsrSection />}
-      <TextModelSection />
+        {tab === "asr" ? (
+          <>
+            <Row
+              title={t("voiceless.models.asr.mode")}
+              description={
+                provider === "local"
+                  ? t("voiceless.models.asr.localDesc")
+                  : t("voiceless.models.asr.cloudDesc")
+              }
+            >
+              <Segmented<AsrProviderKind>
+                value={provider}
+                onChange={(value) => void switchProvider(value)}
+                options={[
+                  { value: "local", label: t("voiceless.models.asr.local") },
+                  { value: "cloud", label: t("voiceless.models.asr.cloud") },
+                ]}
+              />
+            </Row>
+            {provider === "local" ? <LocalModels /> : <CloudAsrBody />}
+          </>
+        ) : (
+          <TextModelBody />
+        )}
+      </TabbedSection>
     </Page>
   );
 };

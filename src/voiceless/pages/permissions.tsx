@@ -9,10 +9,9 @@ import {
   requestMicrophonePermission,
 } from "tauri-plugin-macos-permissions-api";
 import { platform } from "@tauri-apps/plugin-os";
-import { Shield } from "lucide-react";
 import { commands } from "@/bindings";
 import { Button } from "@/components/ui/Button";
-import { Row, Section, StatusPill } from "../ui";
+import { Row, StatusPill } from "../ui";
 import { useFnKeyUsage } from "./HomePage";
 
 /**
@@ -199,63 +198,57 @@ export const PermissionRows: React.FC<{ state: PermissionState }> = ({
   );
 };
 
-/** The permissions block, shown inside the Settings page. */
-export const PermissionsSection: React.FC = () => {
+/**
+ * The rows of the Settings page's Permissions tab; the page supplies the card
+ * and the tab switcher around them.
+ */
+export const PermissionsBody: React.FC = () => {
   const { t } = useTranslation();
   const { state } = usePermissions();
   const { usage, refresh } = useFnKeyUsage();
 
   return (
-    // One flex child of the page, so the hint stays close to its section.
-    <div className="flex flex-col gap-3">
-      <Section
-        icon={<Shield size={20} />}
-        title={t("voiceless.permissions.title")}
-        description={t("voiceless.permissions.description")}
-      >
-        <PermissionRows state={state} />
-        {/* The Fn/Globe key setting only exists on Apple keyboards. */}
-        {IS_MACOS && (
-          <Row
-            title={t("voiceless.permissions.fn.title")}
-            description={
-              usage?.compatible
-                ? t("voiceless.permissions.fn.ok")
-                : t("voiceless.permissions.fn.bad", {
-                    action: t(
-                      `voiceless.shortcuts.fnActions.${usage?.action ?? "unknown"}`,
-                    ),
-                  })
-            }
-          >
-            {usage?.compatible ? (
-              <StatusPill ok>
-                {t("voiceless.shortcuts.fnActions.do_nothing")}
-              </StatusPill>
-            ) : (
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() =>
-                    void commands.openSystemSettingsPane("keyboard")
-                  }
-                >
-                  {t("voiceless.shortcuts.fnWarning.open")}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={refresh}>
-                  {t("voiceless.common.recheck")}
-                </Button>
-              </div>
-            )}
-          </Row>
-        )}
-      </Section>
+    <>
+      <PermissionRows state={state} />
+      {/* The Fn/Globe key setting only exists on Apple keyboards. */}
       {IS_MACOS && (
-        <p className="text-[13px] text-muted leading-relaxed">
+        <Row
+          title={t("voiceless.permissions.fn.title")}
+          description={
+            usage?.compatible
+              ? t("voiceless.permissions.fn.ok")
+              : t("voiceless.permissions.fn.bad", {
+                  action: t(
+                    `voiceless.shortcuts.fnActions.${usage?.action ?? "unknown"}`,
+                  ),
+                })
+          }
+        >
+          {usage?.compatible ? (
+            <StatusPill ok>
+              {t("voiceless.shortcuts.fnActions.do_nothing")}
+            </StatusPill>
+          ) : (
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void commands.openSystemSettingsPane("keyboard")}
+              >
+                {t("voiceless.shortcuts.fnWarning.open")}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={refresh}>
+                {t("voiceless.common.recheck")}
+              </Button>
+            </div>
+          )}
+        </Row>
+      )}
+      {IS_MACOS && (
+        <p className="py-3 text-[13px] text-muted leading-relaxed">
           {t("voiceless.permissions.restartHint")}
         </p>
       )}
-    </div>
+    </>
   );
 };
