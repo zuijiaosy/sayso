@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <mask id="m">
+    <rect x="4" y="9" width="56" height="38" rx="12" fill="#fff" />
+    <path d="M16 36 L7.5 59 Q6 62.5 9.5 60.5 L32 47 Z" fill="#fff" />
+    <circle cx="18" cy="28" r="4.6" fill="#000" />
+    <circle cx="32" cy="28" r="4.6" fill="#000" />
+    <circle cx="46" cy="28" r="4.6" fill="#000" />
+  </mask>
+  <rect width="64" height="64" fill="currentColor" mask="url(#m)" />
+</svg>

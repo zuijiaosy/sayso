@@ -11,6 +11,7 @@ import type { PageId } from "./SettingsShell";
 import { importSenseVoiceFolder, useDefaultModelId } from "./pages/ModelsPage";
 import { PermissionRows, usePermissions } from "./pages/permissions";
 import { FnSettingNotice, useFnKeyUsage } from "./pages/HomePage";
+import { Logo } from "./Logo";
 import { Section } from "./ui";
 
 const Choice: React.FC<{
@@ -25,14 +26,14 @@ const Choice: React.FC<{
     type="button"
     disabled={disabled}
     onClick={onClick}
-    className="w-full flex items-center gap-4 p-4 rounded-2xl border border-mid-gray/25 hover:border-background-ui hover:bg-background-ui/5 text-start cursor-pointer disabled:cursor-default disabled:opacity-70 transition-colors"
+    className="w-full flex items-center gap-4 p-4 rounded-card bg-surface shadow-card hover:bg-accent/5 text-start cursor-pointer disabled:cursor-default disabled:opacity-70 transition-colors"
   >
-    <span className="w-10 h-10 shrink-0 rounded-xl bg-mid-gray/10 grid place-items-center text-text/80">
+    <span className="w-10 h-10 shrink-0 rounded-control bg-accent/10 grid place-items-center text-accent">
       {icon}
     </span>
     <span className="flex-1 min-w-0">
       <span className="block text-[15px] font-semibold">{title}</span>
-      <span className="block text-[13px] text-mid-gray mt-0.5 leading-relaxed">
+      <span className="block text-[13px] text-muted mt-0.5 leading-relaxed">
         {description}
       </span>
     </span>
@@ -42,7 +43,8 @@ const Choice: React.FC<{
 
 const Frame: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="h-screen overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] bg-background text-text select-none">
-    <div className="w-full max-w-[560px] mx-auto px-8 pt-10 pb-12">
+    <div data-tauri-drag-region className="titlebar-strip" />
+    <div className="w-full max-w-[560px] mx-auto px-8 pt-4 pb-12">
       {children}
     </div>
   </div>
@@ -112,10 +114,11 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
   if (step === "permissions") {
     return (
       <Frame>
-        <h1 className="text-[28px] leading-9 font-bold tracking-tight">
+        <Logo size={64} className="mb-4" />
+        <h1 className="font-display text-[30px] leading-10 font-semibold">
           {t("voiceless.onboarding.welcome")}
         </h1>
-        <p className="text-sm text-mid-gray mt-1.5 leading-relaxed">
+        <p className="text-sm text-muted mt-1.5 leading-relaxed">
           {t("voiceless.onboarding.subtitle")}
         </p>
         <div className="mt-8">
@@ -129,7 +132,7 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
             <div className="mt-4">
               <FnSettingNotice usage={usage} />
             </div>
-            <p className="text-[13px] text-mid-gray mt-4 leading-relaxed">
+            <p className="text-[13px] text-muted mt-4 leading-relaxed">
               {t("voiceless.permissions.restartHint")}
             </p>
           </>
@@ -150,7 +153,8 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
 
   return (
     <Frame>
-      <h1 className="text-[28px] leading-9 font-bold tracking-tight">
+      <Logo size={64} className="mb-4" />
+      <h1 className="font-display text-[30px] leading-10 font-semibold">
         {t("voiceless.onboarding.welcome")}
       </h1>
       <div className="mt-8">
@@ -173,7 +177,7 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
               }}
               trailing={
                 pending === "download" ? (
-                  <span className="flex items-center gap-2 whitespace-nowrap text-[13px] text-mid-gray tabular-nums">
+                  <span className="flex items-center gap-2 whitespace-nowrap text-[13px] text-muted tabular-nums">
                     <Loader2 size={15} className="animate-spin" />
                     {downloading
                       ? t("voiceless.models.local.downloading", { percent })

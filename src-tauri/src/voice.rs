@@ -1,4 +1,4 @@
-//! Voiceless voice-input modes: dictation and translation.
+//! Sayso voice-input modes: dictation and translation.
 //!
 //! Pure logic lives here so it can be unit-tested without a Tauri runtime:
 //! which binding maps to which mode, the prompts sent to the text model, how

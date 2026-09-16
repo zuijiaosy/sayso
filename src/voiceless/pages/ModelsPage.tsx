@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/Button";
 import { useSettings } from "@/hooks/useSettings";
 import { useModelStore } from "@/stores/modelStore";
 import {
+  Chip,
   Notice,
   Page,
   Row,
@@ -118,7 +119,7 @@ const ModelRow: React.FC<{
   if (downloading) {
     status = (
       <div className="flex items-center gap-2">
-        <span className="text-[13px] text-mid-gray tabular-nums">
+        <span className="text-[13px] text-muted tabular-nums">
           {t("voiceless.models.local.downloading", { percent })}
         </span>
         <Button
@@ -132,7 +133,7 @@ const ModelRow: React.FC<{
     );
   } else if (verifying || extracting) {
     status = (
-      <span className="text-[13px] text-mid-gray">
+      <span className="text-[13px] text-muted">
         {t(
           verifying
             ? "voiceless.models.local.verifying"
@@ -186,8 +187,8 @@ const ModelRow: React.FC<{
         <span className="flex items-center gap-2 min-w-0">
           <span className="truncate">{model.name}</span>
           {model.id === defaultModelId && (
-            <span className="shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded bg-background-ui/15 text-background-ui">
-              {t("voiceless.models.local.recommended")}
+            <span className="shrink-0">
+              <Chip>{t("voiceless.models.local.recommended")}</Chip>
             </span>
           )}
         </span>
@@ -258,7 +259,7 @@ const LocalModels: React.FC = () => {
             />
           </Button>
         </div>
-        <p className="text-xs text-mid-gray leading-relaxed">
+        <p className="text-xs text-muted leading-relaxed">
           {t("voiceless.models.local.importDesc")}
         </p>
       </div>

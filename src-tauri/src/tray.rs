@@ -195,7 +195,7 @@ pub fn get_icon_path(theme: AppTheme, state: TrayIconState, warning: bool) -> &'
             AppTheme::Light => "resources/tray_idle_warning_dark.png",
             // Linux never sets the warning flag (Secure Input is macOS-only),
             // but fall back to the normal icon just in case.
-            AppTheme::Colored => "resources/handy.png",
+            AppTheme::Colored => "resources/sayso.png",
         };
     }
     match (theme, state) {
@@ -208,7 +208,7 @@ pub fn get_icon_path(theme: AppTheme, state: TrayIconState, warning: bool) -> &'
         (AppTheme::Light, TrayIconState::Recording) => "resources/tray_recording_dark.png",
         (AppTheme::Light, TrayIconState::Transcribing) => "resources/tray_transcribing_dark.png",
         // Colored theme uses pink icons (for Linux)
-        (AppTheme::Colored, TrayIconState::Idle) => "resources/handy.png",
+        (AppTheme::Colored, TrayIconState::Idle) => "resources/sayso.png",
         (AppTheme::Colored, TrayIconState::Recording) => "resources/recording.png",
         (AppTheme::Colored, TrayIconState::Transcribing) => "resources/transcribing.png",
     }
@@ -445,9 +445,9 @@ pub fn tray_tooltip() -> String {
 
 fn version_label() -> String {
     if cfg!(debug_assertions) {
-        format!("Voiceless v{} (Dev)", env!("CARGO_PKG_VERSION"))
+        format!("Sayso v{} (Dev)", env!("CARGO_PKG_VERSION"))
     } else {
-        format!("Voiceless v{}", env!("CARGO_PKG_VERSION"))
+        format!("Sayso v{}", env!("CARGO_PKG_VERSION"))
     }
 }
 
@@ -613,7 +613,7 @@ pub fn set_tray_visibility(app: &AppHandle, visible: bool) {
 /// Recovery for the macOS tray-disappearance bug (#1948, tauri-apps/tauri#12060):
 /// the `NSStatusItem` can silently vanish with no error surfaced to the app.
 /// Hiding and re-showing the tray recreates it with its current icon, menu and
-/// tooltip. Called when the user "relaunches" Handy while it is already running
+/// tooltip. Called when the user "relaunches" Sayso while it is already running
 /// (`RunEvent::Reopen` for Spotlight/Finder/Dock, the single-instance callback
 /// for a second process) — the natural "where did my icon go?" moment — so a
 /// relaunch brings the icon back without a full quit.
@@ -674,7 +674,7 @@ mod tests {
     fn build_entry(transcription: &str, post_processed: Option<&str>) -> HistoryEntry {
         HistoryEntry {
             id: 1,
-            file_name: "handy-1.wav".to_string(),
+            file_name: "sayso-1.wav".to_string(),
             timestamp: 0,
             saved: false,
             title: "Recording".to_string(),

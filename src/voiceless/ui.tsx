@@ -5,21 +5,22 @@ export const Page: React.FC<{
   description?: string;
   children: React.ReactNode;
 }> = ({ title, description, children }) => (
-  <div className="w-full max-w-[680px] mx-auto px-8 pt-8 pb-12">
-    <h1 className="text-[28px] leading-9 font-bold tracking-tight">{title}</h1>
+  <div className="w-full max-w-[680px] mx-auto px-8 pt-6 pb-14">
+    <h1 className="font-display text-[30px] leading-10 font-semibold">
+      {title}
+    </h1>
     {description && (
-      <p className="text-sm text-mid-gray mt-1.5 leading-relaxed">
-        {description}
-      </p>
+      <p className="text-sm text-muted mt-2 leading-relaxed">{description}</p>
     )}
-    <div className="mt-7 flex flex-col gap-10">{children}</div>
+    <div className="mt-6 flex flex-col gap-6">{children}</div>
   </div>
 );
 
 /**
- * A titled group of rows. Sizes deliberately sit between the page title (28px)
- * and a row title (14px) so the three levels stay distinguishable. Omitting
- * `title` drops the header entirely, for a page with a single unlabelled list.
+ * A titled group of rows, rendered as a card so a page reads as a few objects
+ * rather than one long form. Sizes deliberately sit between the page title
+ * (30px) and a row title (14px) so the three levels stay distinguishable.
+ * Omitting `title` drops the header, for a page with a single unlabelled list.
  */
 export const Section: React.FC<{
   icon?: React.ReactNode;
@@ -28,16 +29,16 @@ export const Section: React.FC<{
   actions?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ icon, title, description, actions, children }) => (
-  <section>
+  <section className="bg-surface rounded-card shadow-card px-5">
     {title && (
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pb-3 border-b border-mid-gray/20">
-        {icon && <span className="text-background-ui shrink-0">{icon}</span>}
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pt-4 pb-3 border-b border-border">
+        {icon && <span className="text-accent shrink-0">{icon}</span>}
         <div className="flex-1 min-w-0">
-          <h2 className="text-[17px] leading-6 font-bold tracking-tight">
+          <h2 className="text-[16px] leading-6 font-semibold tracking-tight">
             {title}
           </h2>
           {description && (
-            <p className="text-xs text-mid-gray mt-0.5 leading-relaxed">
+            <p className="text-xs text-muted mt-0.5 leading-relaxed">
               {description}
             </p>
           )}
@@ -47,7 +48,7 @@ export const Section: React.FC<{
         )}
       </div>
     )}
-    <div className="divide-y divide-mid-gray/15">{children}</div>
+    <div className="divide-y divide-border">{children}</div>
   </section>
 );
 
@@ -67,7 +68,7 @@ export const Row: React.FC<{
     <div className="min-w-0 flex-1">
       <div className="text-[14px] font-medium">{title}</div>
       {description && (
-        <div className="text-[13px] text-mid-gray mt-0.5 leading-relaxed">
+        <div className="text-[13px] text-muted mt-0.5 leading-relaxed">
           {description}
         </div>
       )}
@@ -99,12 +100,12 @@ export const Switch: React.FC<{
     aria-label={label}
     disabled={disabled}
     onClick={() => onChange(!checked)}
-    className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-      checked ? "bg-background-ui" : "bg-mid-gray/30"
+    className={`relative w-11 h-6 rounded-pill transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+      checked ? "bg-accent" : "bg-muted/30"
     }`}
   >
     <span
-      className={`absolute top-0.5 start-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+      className={`absolute top-0.5 start-0.5 w-5 h-5 rounded-pill bg-white shadow-sm transition-transform ${
         checked ? "translate-x-5" : ""
       }`}
     />
@@ -128,17 +129,17 @@ export function Segmented<T extends string>({
   disabled?: boolean;
 }) {
   return (
-    <div className="inline-flex p-0.5 rounded-lg bg-mid-gray/15 border border-mid-gray/20">
+    <div className="inline-flex p-0.5 rounded-pill bg-surface-2 border border-border">
       {options.map((option) => (
         <button
           key={option.value}
           type="button"
           disabled={disabled}
           onClick={() => onChange(option.value)}
-          className={`px-3 py-1 text-[13px] rounded-md transition-colors cursor-pointer disabled:cursor-not-allowed ${
+          className={`px-3.5 py-1 text-[13px] rounded-pill transition-colors cursor-pointer disabled:cursor-not-allowed ${
             option.value === value
-              ? "bg-background shadow-sm font-semibold"
-              : "text-mid-gray hover:text-text"
+              ? "bg-surface shadow-sm font-semibold"
+              : "text-muted hover:text-text"
           }`}
         >
           {option.label}
@@ -154,7 +155,7 @@ export const TextInput = React.forwardRef<
 >(({ className = "", ...props }, ref) => (
   <input
     ref={ref}
-    className={`h-9 min-w-0 px-3 text-sm rounded-lg border border-mid-gray/30 bg-background focus:outline-none focus:border-background-ui focus:ring-2 focus:ring-background-ui/20 disabled:opacity-60 ${className}`}
+    className={`h-9 min-w-0 px-3 text-sm rounded-control border border-border bg-surface focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 disabled:opacity-60 ${className}`}
     {...props}
   />
 ));
@@ -164,7 +165,7 @@ export const SelectInput: React.FC<
   React.SelectHTMLAttributes<HTMLSelectElement>
 > = ({ className = "", children, ...props }) => (
   <select
-    className={`h-9 min-w-0 max-w-full px-3 pe-8 text-sm rounded-lg border border-mid-gray/30 bg-background focus:outline-none focus:border-background-ui cursor-pointer disabled:opacity-60 ${className}`}
+    className={`h-9 min-w-0 max-w-full px-3 pe-8 text-sm rounded-control border border-border bg-surface focus:outline-none focus:border-accent cursor-pointer disabled:opacity-60 ${className}`}
     {...props}
   >
     {children}
@@ -176,10 +177,8 @@ export const KeyChip: React.FC<{ label: string; active?: boolean }> = ({
   active,
 }) => (
   <kbd
-    className={`inline-flex items-center h-9 px-3 rounded-lg border text-[15px] font-medium font-sans shadow-[0_1px_0_rgba(0,0,0,0.08)] ${
-      active
-        ? "border-background-ui bg-background-ui/10"
-        : "border-mid-gray/30 bg-background"
+    className={`inline-flex items-center h-9 px-3 rounded-[10px] border text-[15px] font-medium font-sans shadow-key ${
+      active ? "border-accent bg-accent/10" : "border-border bg-surface"
     }`}
   >
     {label}
@@ -193,10 +192,10 @@ export const Notice: React.FC<{
   action?: React.ReactNode;
 }> = ({ tone = "info", title, children, action }) => (
   <div
-    className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${
+    className={`rounded-card border px-4 py-3 flex items-start gap-3 ${
       tone === "warning"
         ? "border-warning/40 bg-warning/10"
-        : "border-mid-gray/25 bg-mid-gray/8"
+        : "border-border bg-surface-2"
     }`}
   >
     <div className="flex-1 min-w-0 text-[13px] leading-relaxed">
@@ -213,12 +212,29 @@ export const StatusPill: React.FC<{
 }> = ({ ok, children }) => (
   <span
     className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${
-      ok ? "text-success" : "text-mid-gray"
+      ok ? "text-success" : "text-muted"
     }`}
   >
     <span
-      className={`w-2 h-2 shrink-0 rounded-full ${ok ? "bg-success" : "bg-mid-gray/50"}`}
+      className={`w-2 h-2 shrink-0 rounded-pill ${ok ? "bg-success" : "bg-muted/50"}`}
     />
+    {children}
+  </span>
+);
+
+/**
+ * A small label chip. Replaces the inline accent-tinted spans that History and
+ * Models had each grown their own copy of.
+ */
+export const Chip: React.FC<{
+  children: React.ReactNode;
+  tone?: "accent" | "neutral";
+}> = ({ children, tone = "accent" }) => (
+  <span
+    className={`inline-flex items-center px-2 py-0.5 rounded-pill text-[11px] font-medium leading-normal ${
+      tone === "accent" ? "bg-accent/12 text-accent" : "bg-muted/15 text-muted"
+    }`}
+  >
     {children}
   </span>
 );

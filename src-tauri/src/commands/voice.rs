@@ -1,4 +1,4 @@
-//! Commands for Voiceless dictate / translate sessions.
+//! Commands for Sayso dictate / translate sessions.
 
 use crate::actions::{paste_and_finish, run_text_model, show_translation_failure};
 use crate::settings::{
@@ -349,7 +349,7 @@ pub fn parse_dictionary_text(text: &str) -> Vec<DictionaryEntry> {
 }
 
 pub fn format_dictionary_text(entries: &[DictionaryEntry]) -> String {
-    let mut out = String::from("# Voiceless dictionary: term | aliases | translation | note\n");
+    let mut out = String::from("# Sayso dictionary: term | aliases | translation | note\n");
     for e in entries {
         let fields = [
             e.term.clone(),

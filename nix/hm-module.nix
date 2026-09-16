@@ -1,8 +1,8 @@
-# Home-manager module for Handy speech-to-text
+# Home-manager module for Sayso speech-to-text
 #
 # Provides a systemd user service for autostart.
-# Usage: imports = [ handy.homeManagerModules.default ];
-#        services.handy.enable = true;
+# Usage: imports = [ sayso.homeManagerModules.default ];
+#        services.sayso.enable = true;
 {
   config,
   lib,
@@ -10,28 +10,28 @@
   ...
 }:
 let
-  cfg = config.services.handy;
+  cfg = config.services.sayso;
 in
 {
-  options.services.handy = {
-    enable = lib.mkEnableOption "Handy speech-to-text user service";
+  options.services.sayso = {
+    enable = lib.mkEnableOption "Sayso speech-to-text user service";
 
     package = lib.mkOption {
       type = lib.types.package;
-      defaultText = lib.literalExpression "handy.packages.\${system}.handy";
-      description = "The Handy package to use.";
+      defaultText = lib.literalExpression "sayso.packages.\${system}.sayso";
+      description = "The Sayso package to use.";
     };
   };
 
   config = lib.mkIf cfg.enable {
-    systemd.user.services.handy = {
+    systemd.user.services.sayso = {
       Unit = {
-        Description = "Handy speech-to-text";
+        Description = "Sayso speech-to-text";
         After = [ "graphical-session.target" ];
         PartOf = [ "graphical-session.target" ];
       };
       Service = {
-        ExecStart = "${cfg.package}/bin/handy";
+        ExecStart = "${cfg.package}/bin/sayso";
         Restart = "on-failure";
         RestartSec = 5;
       };

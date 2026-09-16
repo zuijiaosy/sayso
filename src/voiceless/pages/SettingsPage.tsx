@@ -3,11 +3,13 @@ import { useTranslation } from "react-i18next";
 import { getVersion } from "@tauri-apps/api/app";
 import { exit } from "@tauri-apps/plugin-process";
 import { Info, SlidersHorizontal } from "lucide-react";
-import { commands, type TranslateTarget } from "@/bindings";
+import { commands, type Theme, type TranslateTarget } from "@/bindings";
 import { Button } from "@/components/ui/Button";
 import { useSettings } from "@/hooks/useSettings";
 import { SUPPORTED_LANGUAGES } from "@/i18n";
-import { Page, Row, Section, SelectInput, Switch } from "../ui";
+import { THEME_OPTIONS, applyTheme } from "@/lib/utils/theme";
+import { Page, Row, Section, Segmented, SelectInput, Switch } from "../ui";
+import { Logo } from "../Logo";
 import { PermissionsSection } from "./permissions";
 
 export const languageLabel = (code: string, uiLanguage: string) => {
@@ -125,6 +127,25 @@ export const SettingsPage: React.FC = () => {
             }
           />
         </Row>
+        <Row title={t("voiceless.general.appearance")}>
+          <Segmented<Theme>
+            value={settings.theme ?? "system"}
+            onChange={(value) => {
+              // Apply immediately so the window repaints without waiting on the
+              // settings round-trip; the store call persists it.
+              applyTheme(value);
+              void updateSetting("theme", value);
+            }}
+            options={THEME_OPTIONS.map((option) => ({
+              value: option,
+              label: t(
+                `voiceless.general.appearance${
+                  option.charAt(0).toUpperCase() + option.slice(1)
+                }`,
+              ),
+            }))}
+          />
+        </Row>
         <Row title={t("voiceless.general.appLanguage")}>
           <SelectInput
             value={settings.app_language}
@@ -146,7 +167,12 @@ export const SettingsPage: React.FC = () => {
 
       <Section icon={<Info size={20} />} title={t("voiceless.general.about")}>
         <Row
-          title={t("voiceless.appName")}
+          title={
+            <span className="flex items-center gap-2">
+              <Logo size={18} />
+              {t("voiceless.appName")}
+            </span>
+          }
           description={
             <>
               {t("voiceless.general.version", { version })}

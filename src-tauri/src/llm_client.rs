@@ -153,8 +153,8 @@ fn build_headers(provider: &PostProcessProvider, api_key: &str) -> Result<Header
 
     // Common headers
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-    headers.insert(USER_AGENT, HeaderValue::from_static("Voiceless/0.1"));
-    headers.insert("X-Title", HeaderValue::from_static("Voiceless"));
+    headers.insert(USER_AGENT, HeaderValue::from_static("Sayso/0.1"));
+    headers.insert("X-Title", HeaderValue::from_static("Sayso"));
 
     // Provider-specific auth headers
     if !api_key.is_empty() {
@@ -304,7 +304,7 @@ fn report_reqwest_error(context: &str, error: &reqwest::Error) -> String {
 /// Send a chat completion request to an OpenAI-compatible API
 /// Returns Ok(Some(content)) on success, Ok(None) if response has no content,
 /// or Err on actual errors (HTTP, parsing, etc.)
-#[allow(dead_code)] // upstream API; Voiceless always sends a system prompt
+#[allow(dead_code)] // upstream API; Sayso always sends a system prompt
 pub async fn send_chat_completion(
     provider: &PostProcessProvider,
     api_key: String,
@@ -728,7 +728,7 @@ mod tests {
             .unwrap();
         let result = tauri::async_runtime::block_on(send_chat_completion_with_schema(
             &provider,
-            "sk-voiceless-invalid-key".into(),
+            "sk-sayso-invalid-key".into(),
             "deepseek-flash",
             "ping".into(),
             Some("reply with pong".into()),

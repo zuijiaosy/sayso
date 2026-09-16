@@ -201,7 +201,7 @@ const settingUpdaters: {
     commands.changeTranscribeGpuDevice(value as string | null),
   extra_recording_buffer_ms: (value) =>
     commands.changeExtraRecordingBufferSetting(value as number),
-  // Voiceless
+  // Sayso
   dictation_post_mode: (value) =>
     commands.updateDictationPostMode(value as DictationPostMode),
   translate_target_language: async (value) => {

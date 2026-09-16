@@ -549,14 +549,14 @@ async isUpdateChecksLocked() : Promise<boolean> {
     return await TAURI_INVOKE("is_update_checks_locked");
 },
 /**
- * Read `AppleFnUsageType` without modifying it. Voiceless never writes this
+ * Read `AppleFnUsageType` without modifying it. Sayso never writes this
  * preference; the UI only links the user to Keyboard settings.
  */
 async getFnKeyUsage() : Promise<FnKeyUsage> {
     return await TAURI_INVOKE("get_fn_key_usage");
 },
 /**
- * Open a System Settings pane relevant to Voiceless.
+ * Open a System Settings pane relevant to Sayso.
  * `pane`: `keyboard` | `accessibility` | `input_monitoring` | `microphone`.
  */
 async openSystemSettingsPane(pane: string) : Promise<Result<null, string>> {
@@ -1214,19 +1214,19 @@ vad_backend?: VadBackend;
  */
 overlay_style?: OverlayStyle; 
 /**
- * Voiceless: how dictation text is post-processed by the text model.
+ * Sayso: how dictation text is post-processed by the text model.
  */
 dictation_post_mode?: DictationPostMode; 
 /**
- * Voiceless: BCP 47 code of the translation target, e.g. `en-US`.
+ * Sayso: BCP 47 code of the translation target, e.g. `en-US`.
  */
 translate_target_language?: string; 
 /**
- * Voiceless: custom dictionary.
+ * Sayso: custom dictionary.
  */
 dictionary?: DictionaryEntry[]; 
 /**
- * Voiceless: speech recognition engine.
+ * Sayso: speech recognition engine.
  */
 asr_provider?: AsrProviderKind; cloud_asr_provider?: CloudAsrProvider; dashscope_asr?: DashScopeAsrSettings; glm_asr?: GlmAsrSettings; stepfun_asr?: StepFunAsrSettings; 
 /**

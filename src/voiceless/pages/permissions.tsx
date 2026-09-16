@@ -252,7 +252,7 @@ export const PermissionsSection: React.FC = () => {
         )}
       </Section>
       {IS_MACOS && (
-        <p className="text-[13px] text-mid-gray leading-relaxed">
+        <p className="text-[13px] text-muted leading-relaxed">
           {t("voiceless.permissions.restartHint")}
         </p>
       )}

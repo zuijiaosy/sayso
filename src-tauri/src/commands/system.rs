@@ -1,4 +1,4 @@
-//! macOS system-setting checks that affect Voiceless shortcuts.
+//! macOS system-setting checks that affect Sayso shortcuts.
 
 use serde::Serialize;
 use specta::Type;
@@ -32,7 +32,7 @@ pub fn classify_fn_usage(value: Option<i32>) -> FnKeyUsage {
     }
 }
 
-/// Read `AppleFnUsageType` without modifying it. Voiceless never writes this
+/// Read `AppleFnUsageType` without modifying it. Sayso never writes this
 /// preference; the UI only links the user to Keyboard settings.
 #[tauri::command]
 #[specta::specta]
@@ -58,7 +58,7 @@ pub fn get_fn_key_usage() -> FnKeyUsage {
     }
 }
 
-/// Open a System Settings pane relevant to Voiceless.
+/// Open a System Settings pane relevant to Sayso.
 /// `pane`: `keyboard` | `accessibility` | `input_monitoring` | `microphone`.
 #[tauri::command]
 #[specta::specta]

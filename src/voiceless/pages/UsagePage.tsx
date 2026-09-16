@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Page, Segmented } from "../ui";
 
 /** Typing speed the "faster than typing" figure is measured against. */
-const TYPING_BASELINE_CPM = 40;
+export const TYPING_BASELINE_CPM = 40;
 /** Weeks shown in the activity grid. */
 const HEATMAP_WEEKS = 20;
 
@@ -64,6 +64,24 @@ export const byDay = (days: UsageDay[]): Map<string, DayTotals> => {
   return out;
 };
 
+/**
+ * This week's character count and the overall speaking speed in characters per
+ * minute. Shared with the home page hero so the two surfaces cannot disagree.
+ */
+export const weekAndSpeed = (totals: Map<string, DayTotals>) => {
+  const all = sum([...totals.values()]);
+  const weekStart = dayKey(startOfWeek(new Date()));
+  const week = sum(
+    [...totals.entries()]
+      .filter(([day]) => day >= weekStart)
+      .map(([, value]) => value),
+  );
+  return {
+    weekChars: week.chars,
+    cpm: all.audioMs > 0 ? all.chars / (all.audioMs / 60_000) : 0,
+  };
+};
+
 /** Consecutive active days ending today (or yesterday, while today is still
  * unused), plus the longest such run ever. */
 export const streaks = (active: Set<string>) => {
@@ -88,17 +106,40 @@ export const streaks = (active: Set<string>) => {
   return { current, longest };
 };
 
+/**
+ * Card washes for the metric grid. Each tile gets its own hue so the six
+ * numbers read as distinct facts rather than one undifferentiated table; the
+ * tints are mixed over the surface at `--tint-strength` so they stay legible in
+ * both themes.
+ */
+const TINTS = [
+  "--color-tint-peach",
+  "--color-tint-butter",
+  "--color-tint-sage",
+  "--color-tint-sky",
+  "--color-tint-lilac",
+  "--color-tint-rose",
+] as const;
+
+type Tint = (typeof TINTS)[number];
+
 const Metric: React.FC<{
   label: string;
   value: string;
   hint?: string;
-}> = ({ label, value, hint }) => (
-  <div className="rounded-2xl border border-mid-gray/20 px-4 py-3.5">
-    <div className="text-[12px] text-mid-gray">{label}</div>
+  tint: Tint;
+}> = ({ label, value, hint, tint }) => (
+  <div
+    className="rounded-card px-4 py-3.5 shadow-card"
+    style={{
+      background: `color-mix(in srgb, var(${tint}) var(--tint-strength), var(--color-surface))`,
+    }}
+  >
+    <div className="text-[12px] text-muted">{label}</div>
     <div className="mt-1 text-[24px] leading-8 font-bold tabular-nums tracking-tight">
       {value}
     </div>
-    {hint && <div className="mt-0.5 text-[12px] text-mid-gray">{hint}</div>}
+    {hint && <div className="mt-0.5 text-[12px] text-muted">{hint}</div>}
   </div>
 );
 
@@ -109,12 +150,7 @@ const levelFor = (chars: number) => {
   return 3;
 };
 
-const LEVEL_CLASS = [
-  "bg-mid-gray/15",
-  "bg-background-ui/30",
-  "bg-background-ui/60",
-  "bg-background-ui",
-];
+const LEVEL_CLASS = ["bg-border", "bg-accent/30", "bg-accent/60", "bg-accent"];
 
 const Heatmap: React.FC<{ totals: Map<string, DayTotals> }> = ({ totals }) => {
   const { t, i18n } = useTranslation();
@@ -148,7 +184,7 @@ const Heatmap: React.FC<{ totals: Map<string, DayTotals> }> = ({ totals }) => {
         {weeks[0].map((date, row) => (
           <span
             key={row}
-            className="h-3 text-[10px] leading-3 text-mid-gray text-end"
+            className="h-3 text-[10px] leading-3 text-muted text-end"
           >
             {row % 2 === 0 ? weekdayFormat.format(date) : ""}
           </span>
@@ -172,13 +208,13 @@ const Heatmap: React.FC<{ totals: Map<string, DayTotals> }> = ({ totals }) => {
                       "voiceless.usage.charsUnit",
                       { count: chars },
                     )}`}
-                    className={`w-3 h-3 rounded-full ${
+                    className={`w-3 h-3 rounded-pill ${
                       future ? "bg-transparent" : LEVEL_CLASS[levelFor(chars)]
                     }`}
                   />
                 );
               })}
-              <span className="h-3 text-[10px] leading-3 text-mid-gray">
+              <span className="h-3 text-[10px] leading-3 text-muted">
                 {showMonth ? monthFormat.format(week[0]) : ""}
               </span>
             </div>
@@ -223,25 +259,19 @@ export const UsagePage: React.FC = () => {
 
   const stats = useMemo(() => {
     const all = sum([...totals.values()]);
-    const weekStart = dayKey(startOfWeek(new Date()));
-    const week = sum(
-      [...totals.entries()]
-        .filter(([day]) => day >= weekStart)
-        .map(([, value]) => value),
-    );
     const active = new Set(
       [...totals.entries()]
         .filter(([, value]) => value.sessions > 0)
         .map(([day]) => day),
     );
-    const cpm = all.audioMs > 0 ? all.chars / (all.audioMs / 60_000) : 0;
     const dictateChars = days
       .filter((day) => day.mode === "dictate")
       .reduce((acc, day) => acc + day.chars, 0);
+    const { weekChars, cpm } = weekAndSpeed(totals);
 
     return {
       all,
-      week,
+      weekChars,
       cpm,
       dictateShare: all.chars > 0 ? dictateChars / all.chars : 0,
       activeDays: active.size,
@@ -309,7 +339,7 @@ export const UsagePage: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Metric
             label={t("voiceless.usage.weekChars")}
-            value={number.format(stats.week.chars)}
+            value={number.format(stats.weekChars)}
             hint={
               filter === "all" && stats.all.chars > 0
                 ? t("voiceless.usage.split", {
@@ -318,23 +348,28 @@ export const UsagePage: React.FC = () => {
                   })
                 : undefined
             }
+            tint={"--color-tint-peach"}
           />
           <Metric
             label={t("voiceless.usage.totalChars")}
             value={number.format(stats.all.chars)}
+            tint={"--color-tint-butter"}
           />
           <Metric
             label={t("voiceless.usage.sessions")}
             value={number.format(stats.all.sessions)}
+            tint={"--color-tint-sage"}
           />
           <Metric
             label={t("voiceless.usage.duration")}
             value={duration(stats.all.audioMs)}
+            tint={"--color-tint-sky"}
           />
           <Metric
             label={t("voiceless.usage.speed")}
             value={speed}
             hint={t("voiceless.usage.speedUnit")}
+            tint={"--color-tint-lilac"}
           />
           <Metric
             label={t("voiceless.usage.gain")}
@@ -342,15 +377,16 @@ export const UsagePage: React.FC = () => {
             hint={t("voiceless.usage.gainHint", {
               baseline: TYPING_BASELINE_CPM,
             })}
+            tint={"--color-tint-rose"}
           />
         </div>
 
-        <div className="rounded-2xl border border-mid-gray/20 px-4 py-4">
+        <div className="rounded-card bg-surface shadow-card px-4 py-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2 pb-3">
             <h2 className="text-[14px] font-semibold">
               {t("voiceless.usage.activeDays", { count: stats.activeDays })}
             </h2>
-            <span className="text-[12px] text-mid-gray">
+            <span className="text-[12px] text-muted">
               {t("voiceless.usage.streak", {
                 current: stats.current,
                 longest: stats.longest,
@@ -358,12 +394,12 @@ export const UsagePage: React.FC = () => {
             </span>
           </div>
           <Heatmap totals={totals} />
-          <div className="mt-2 flex items-center justify-end gap-1.5 text-[11px] text-mid-gray">
+          <div className="mt-2 flex items-center justify-end gap-1.5 text-[11px] text-muted">
             <span>{t("voiceless.usage.less")}</span>
             {LEVEL_CLASS.map((className) => (
               <span
                 key={className}
-                className={`w-2.5 h-2.5 rounded-full ${className}`}
+                className={`w-2.5 h-2.5 rounded-pill ${className}`}
               />
             ))}
             <span>{t("voiceless.usage.more")}</span>

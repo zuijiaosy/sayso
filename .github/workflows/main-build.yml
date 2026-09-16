@@ -40,7 +40,7 @@ jobs:
       platform: ${{ matrix.platform }}
       target: ${{ matrix.target }}
       build-args: ${{ matrix.args }}
-      asset-prefix: "voiceless"
+      asset-prefix: "sayso"
       upload-artifacts: true
       sign-binaries: false
       no-cache: false
@@ -58,19 +58,19 @@ jobs:
           BUILD_RESULT: ${{ needs.build.result }}
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          ## Voiceless installers
+          ## Sayso installers
 
           Download them from the **Artifacts** section of this workflow run:
 
           | Artifact | Contents |
           | --- | --- |
-          | `voiceless-aarch64-apple-darwin` | macOS Apple Silicon `.dmg` and `.app` |
-          | `voiceless-x86_64-pc-windows-msvc` | Windows x64 `.msi` and NSIS `.exe` |
+          | `sayso-aarch64-apple-darwin` | macOS Apple Silicon `.dmg` and `.app` |
+          | `sayso-x86_64-pc-windows-msvc` | Windows x64 `.msi` and NSIS `.exe` |
 
           The GitHub Actions builds are unsigned. After moving the macOS app to `/Applications`, verify that it came from this repository, then run:
 
           ```bash
-          xattr -cr /Applications/Voiceless.app
+          xattr -cr /Applications/Sayso.app
           ```
 
           Windows has no Authenticode signature, so SmartScreen will warn on first run.

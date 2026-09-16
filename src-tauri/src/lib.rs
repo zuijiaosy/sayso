@@ -15,6 +15,7 @@ mod input;
 mod llm_client;
 mod managers;
 mod memory;
+mod migration;
 mod overlay;
 mod paste_tx;
 pub mod portable;
@@ -153,7 +154,7 @@ fn apply_startup_activation_policy(app: &mut tauri::App, headless_mode: bool) {
 
     let tray_available = settings.show_tray_icon && !cli_args.no_tray;
 
-    // Voiceless is a menu-bar app: whenever a tray icon exists it launches as
+    // Sayso is a menu-bar app: whenever a tray icon exists it launches as
     // Accessory. If the settings window is shown at startup (first-run
     // onboarding), `show_main_window` promotes to Regular, which is the
     // supported direction; closing it demotes back.
@@ -648,6 +649,12 @@ pub fn run(cli_args: CliArgs) {
     // Detect portable mode before anything else
     portable::init();
 
+    // Adopt a previous bundle identifier's data dir. Must run before the Tauri
+    // builder exists: tauri-plugin-store caches a store the first time it is
+    // opened, so a store opened against the still-empty new dir would later
+    // overwrite the migrated file with cached defaults.
+    migration::migrate_legacy_data_dir();
+
     // Parse console logging directives from RUST_LOG, falling back to info-level logging
     // when the variable is unset
     let console_filter = build_console_filter();
@@ -853,11 +860,11 @@ pub fn run(cli_args: CliArgs) {
                     Target::new(if let Some(data_dir) = portable::data_dir() {
                         TargetKind::Folder {
                             path: data_dir.join("logs"),
-                            file_name: Some("voiceless".into()),
+                            file_name: Some("sayso".into()),
                         }
                     } else {
                         TargetKind::LogDir {
-                            file_name: Some("voiceless".into()),
+                            file_name: Some("sayso".into()),
                         }
                     })
                     .filter(|metadata| {
@@ -882,7 +889,7 @@ pub fn run(cli_args: CliArgs) {
         builder = builder.plugin(tauri_nspanel::init());
     }
 
-    // Single-instance forwards CLI args to an already-running Handy and exits.
+    // Single-instance forwards CLI args to an already-running Sayso and exits.
     // That would make the headless path
     // (--transcribe-file/--list-devices/--list-models) a silent no-op whenever the
     // app is already open, so skip it in headless mode and run a standalone
@@ -980,12 +987,23 @@ pub fn run(cli_args: CliArgs) {
             // for portable mode (redirects WebView2 cache to portable Data dir)
             let mut win_builder =
                 tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
-                    .title("Voiceless")
-                    .inner_size(680.0, 570.0)
+                    .title("Sayso")
+                    .inner_size(720.0, 600.0)
                     .min_inner_size(680.0, 570.0)
                     .resizable(true)
                     .maximizable(true)
                     .visible(false);
+
+            // Let the sidebar run up behind the traffic lights instead of
+            // sitting under an opaque title bar. The window keeps its native
+            // controls; only the bar's chrome and title are hidden, so the
+            // frontend supplies its own drag region (see SettingsShell).
+            #[cfg(target_os = "macos")]
+            {
+                win_builder = win_builder
+                    .title_bar_style(tauri::TitleBarStyle::Overlay)
+                    .hidden_title(true);
+            }
 
             if let Some(data_dir) = portable::data_dir() {
                 win_builder = win_builder.data_directory(data_dir.join("webview"));
@@ -1082,7 +1100,7 @@ pub fn run(cli_args: CliArgs) {
             // But if permission onboarding is required, always show the window.
             let should_hide = settings.start_hidden || cli_args.start_hidden;
             // First run always opens the window so permissions and the model
-            // can be set up; afterwards Voiceless lives in the menu bar.
+            // can be set up; afterwards Sayso lives in the menu bar.
             let should_force_show = should_force_show_permissions_window(&app_handle)
                 || !settings.onboarding_completed;
 

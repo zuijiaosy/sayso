@@ -1,5 +1,5 @@
 {
-  "name": "voiceless",
+  "name": "sayso",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -16,6 +16,8 @@
     "format:backend": "cd src-tauri && cargo fmt",
     "test:playwright": "playwright test",
     "test:playwright:ui": "playwright test --ui",
+    "icons": "bun scripts/gen-app-icon.ts && tauri icon src-tauri/icons/logo.png",
+    "icons:tray": "bun scripts/gen-tray-icons.ts",
     "build:signed": "bun scripts/build-signed.ts",
     "check:translations": "bun scripts/check-translations.ts",
     "postinstall": "bun scripts/check-nix-deps.ts"

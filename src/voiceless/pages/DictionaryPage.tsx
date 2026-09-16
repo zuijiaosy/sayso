@@ -22,7 +22,7 @@ const Field: React.FC<
   { label: string } & React.InputHTMLAttributes<HTMLInputElement>
 > = ({ label, ...inputProps }) => (
   <label className="flex flex-col gap-1 min-w-0">
-    <span className="text-[11px] leading-4 text-mid-gray">{label}</span>
+    <span className="text-[11px] leading-4 text-muted">{label}</span>
     <TextInput className="w-full" {...inputProps} />
   </label>
 );
@@ -163,7 +163,7 @@ export const DictionaryPage: React.FC = () => {
               {t("voiceless.dictionary.importTitle")}
             </div>
             <textarea
-              className="w-full min-w-0 min-h-32 p-3 text-sm font-mono rounded-lg border border-mid-gray/30 bg-background focus:outline-none focus:border-background-ui"
+              className="w-full min-w-0 min-h-32 p-3 text-sm font-mono rounded-control border border-border bg-surface focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
               placeholder={t("voiceless.dictionary.importPlaceholder")}
               value={importText}
               spellCheck={false}
@@ -195,7 +195,7 @@ export const DictionaryPage: React.FC = () => {
             <div className="relative">
               <Search
                 size={15}
-                className="absolute start-3 top-1/2 -translate-y-1/2 text-mid-gray"
+                className="absolute start-3 top-1/2 -translate-y-1/2 text-muted"
               />
               <TextInput
                 className="w-full ps-9"
@@ -208,7 +208,7 @@ export const DictionaryPage: React.FC = () => {
         )}
 
         {drafts !== null && drafts.length === 0 && (
-          <p className="py-6 text-sm text-mid-gray">
+          <p className="py-6 text-sm text-muted">
             {t("voiceless.dictionary.empty")}
           </p>
         )}
@@ -234,7 +234,7 @@ export const DictionaryPage: React.FC = () => {
             />
             <button
               type="button"
-              className="h-9 w-9 grid place-items-center rounded-lg text-mid-gray hover:text-error hover:bg-error/10 cursor-pointer"
+              className="h-9 w-9 grid place-items-center rounded-control text-muted hover:text-error hover:bg-error/10 cursor-pointer"
               aria-label={t("voiceless.common.delete")}
               title={t("voiceless.common.delete")}
               onClick={() => remove(draft.key)}

@@ -131,10 +131,10 @@ const BindingBox: React.FC<{
   trailing?: React.ReactNode;
 }> = ({ chips, recording, placeholder, onClick, trailing }) => (
   <div
-    className={`flex items-center gap-2 min-h-[52px] w-[232px] max-w-full ps-2 pe-2 py-2 rounded-2xl border transition-colors ${
+    className={`flex items-center gap-2 min-h-[52px] w-[232px] max-w-full ps-2 pe-2 py-2 rounded-card border transition-colors ${
       recording
-        ? "border-background-ui ring-2 ring-background-ui/20"
-        : "border-mid-gray/30 hover:border-mid-gray/60"
+        ? "border-accent ring-2 ring-accent/25 bg-accent/5"
+        : "border-border bg-surface-2 hover:border-accent/40"
     }`}
   >
     <button
@@ -147,7 +147,7 @@ const BindingBox: React.FC<{
           <KeyChip key={`${chip}-${i}`} label={chip} active={recording} />
         ))
       ) : (
-        <span className="text-sm text-mid-gray px-2">{placeholder}</span>
+        <span className="text-sm text-muted px-2">{placeholder}</span>
       )}
     </button>
     {trailing}
@@ -196,7 +196,7 @@ export const ShortcutField: React.FC<{ bindingId: string }> = ({
               type="button"
               title={t("voiceless.shortcuts.reset")}
               aria-label={t("voiceless.shortcuts.reset")}
-              className="shrink-0 p-1.5 rounded-md text-mid-gray hover:text-text hover:bg-mid-gray/15 cursor-pointer"
+              className="shrink-0 p-1.5 rounded-md text-muted hover:text-text hover:bg-muted/15 cursor-pointer"
               onClick={() => void resetBinding(bindingId)}
             >
               <RotateCcw size={15} />

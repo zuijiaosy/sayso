@@ -833,7 +833,7 @@ mod tests {
                 audio_ms
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
-                format!("handy-{}.wav", timestamp),
+                format!("sayso-{}.wav", timestamp),
                 timestamp,
                 false,
                 format!("Recording {}", timestamp),
@@ -913,16 +913,16 @@ mod tests {
 
         for timestamp in [100, 200, 300] {
             insert_entry(&conn, timestamp, "kept text", None);
-            fs::write(dir.path().join(format!("handy-{timestamp}.wav")), b"wav")
+            fs::write(dir.path().join(format!("sayso-{timestamp}.wav")), b"wav")
                 .expect("write fake recording");
         }
 
         HistoryManager::cleanup_by_count_with_conn(&conn, dir.path(), 1).expect("cleanup by count");
 
         // The newest recording survives; the older two lose only their audio.
-        assert!(dir.path().join("handy-300.wav").exists());
-        assert!(!dir.path().join("handy-200.wav").exists());
-        assert!(!dir.path().join("handy-100.wav").exists());
+        assert!(dir.path().join("sayso-300.wav").exists());
+        assert!(!dir.path().join("sayso-200.wav").exists());
+        assert!(!dir.path().join("sayso-100.wav").exists());
 
         let page = HistoryManager::query_entries_with_conn(&conn, None, None, None, None)
             .expect("query entries");
@@ -933,7 +933,7 @@ mod tests {
                 .find(|e| e.timestamp == ts)
                 .expect("entry exists")
         };
-        assert_eq!(by_timestamp(300).file_name, "handy-300.wav");
+        assert_eq!(by_timestamp(300).file_name, "sayso-300.wav");
         assert_eq!(by_timestamp(200).file_name, "");
         assert_eq!(by_timestamp(100).transcription_text, "kept text");
     }

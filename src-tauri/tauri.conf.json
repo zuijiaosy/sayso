@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Voiceless",
+  "productName": "Sayso",
   "version": "0.1.0",
-  "identifier": "com.voiceless.desktop",
+  "identifier": "com.sayso.desktop",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -46,7 +46,7 @@
       "deb": {
         "depends": ["libgtk-layer-shell0", "libopenblas0"],
         "files": {
-          "/usr/lib/Voiceless": "transcribe-libs"
+          "/usr/lib/Sayso": "transcribe-libs"
         }
       },
       "rpm": {
@@ -58,7 +58,7 @@
           "type": "none"
         },
         "files": {
-          "/usr/lib/Voiceless": "transcribe-libs"
+          "/usr/lib/Sayso": "transcribe-libs"
         }
       },
       "appimage": {

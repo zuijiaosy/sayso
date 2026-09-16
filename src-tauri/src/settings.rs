@@ -636,16 +636,16 @@ pub struct AppSettings {
     /// `overlay_position` (position `none` → style `None`).
     #[serde(default = "default_overlay_style")]
     pub overlay_style: OverlayStyle,
-    /// Voiceless: how dictation text is post-processed by the text model.
+    /// Sayso: how dictation text is post-processed by the text model.
     #[serde(default)]
     pub dictation_post_mode: DictationPostMode,
-    /// Voiceless: BCP 47 code of the translation target, e.g. `en-US`.
+    /// Sayso: BCP 47 code of the translation target, e.g. `en-US`.
     #[serde(default = "default_translate_target_language")]
     pub translate_target_language: String,
-    /// Voiceless: custom dictionary.
+    /// Sayso: custom dictionary.
     #[serde(default)]
     pub dictionary: Vec<DictionaryEntry>,
-    /// Voiceless: speech recognition engine.
+    /// Sayso: speech recognition engine.
     #[serde(default)]
     pub asr_provider: AsrProviderKind,
     #[serde(default)]
@@ -688,7 +688,7 @@ fn default_translate_to_english() -> bool {
 }
 
 fn default_start_hidden() -> bool {
-    // Voiceless is a menu-bar app; the window only opens on demand (and for
+    // Sayso is a menu-bar app; the window only opens on demand (and for
     // first-run onboarding, see lib.rs).
     true
 }
@@ -698,7 +698,7 @@ fn default_autostart_enabled() -> bool {
 }
 
 fn default_update_checks_enabled() -> bool {
-    // Voiceless ships no update feed yet.
+    // Sayso ships no update feed yet.
     false
 }
 
@@ -721,7 +721,7 @@ fn default_overlay_position() -> OverlayPosition {
 }
 
 fn default_overlay_style() -> OverlayStyle {
-    // Linux hides the overlay by default. Voiceless uses the compact capsule
+    // Linux hides the overlay by default. Sayso uses the compact capsule
     // elsewhere (its default model does not stream live text).
     #[cfg(target_os = "linux")]
     return OverlayStyle::None;
@@ -1032,7 +1032,7 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
 pub const SETTINGS_STORE_PATH: &str = "settings_store.json";
 
 pub fn get_default_settings() -> AppSettings {
-    // Voiceless defaults: Fn dictates, Fn + Left Shift translates (Apple
+    // Sayso defaults: Fn dictates, Fn + Left Shift translates (Apple
     // keyboards only; see README). The `_alt` bindings are optional second
     // shortcuts ("add another") and start unset.
     #[cfg(target_os = "macos")]
@@ -1140,7 +1140,7 @@ pub fn get_default_settings() -> AppSettings {
         paste_delay_ms: default_paste_delay_ms(),
         paste_delay_after_ms: default_paste_delay_after_ms(),
         // Receipt-sequenced paste restores the clipboard only after the target
-        // app actually read it (see paste_tx). Voiceless enables it on macOS.
+        // app actually read it (see paste_tx). Sayso enables it on macOS.
         reliable_paste: cfg!(target_os = "macos"),
         typing_tool: default_typing_tool(),
         external_script_path: None,
@@ -1356,7 +1356,7 @@ fn apply_settings_migrations(
         }
     }
     if stored_schema_version < 3 {
-        // Voiceless replaces upstream's post-process shortcut with separate
+        // Sayso replaces upstream's post-process shortcut with separate
         // dictate/translate bindings; the post-process mode is a setting now.
         if settings
             .bindings
@@ -1448,7 +1448,7 @@ fn apply_settings_migrations(
 pub fn update_checks_forced_disabled() -> bool {
     use std::sync::OnceLock;
     static IS_UPDATER_DISABLED: OnceLock<bool> = OnceLock::new();
-    // Voiceless has no update endpoint, so the updater is always locked off.
+    // Sayso has no update endpoint, so the updater is always locked off.
     *IS_UPDATER_DISABLED.get_or_init(|| {
         let _ = utils::env_flag_enabled("HANDY_DISABLE_UPDATER");
         true
@@ -1585,7 +1585,7 @@ mod tests {
             "overlay_position": "bottom",
             "debug_mode": false,
             "log_level": 2,
-            "custom_words": ["Handy", "cjpais"],
+            "custom_words": ["Sayso", "cjpais"],
             "model_unload_timeout": "min5",
             "word_correction_threshold": 0.18,
             "history_limit": 5,
@@ -1691,14 +1691,14 @@ mod tests {
         let map = stored.as_object_mut().unwrap();
         map.insert("paste_delay_ms".into(), serde_json::json!("sixty"));
         map.insert("sound_theme".into(), serde_json::json!(42));
-        map.insert("custom_words".into(), serde_json::json!(["handy"]));
+        map.insert("custom_words".into(), serde_json::json!(["sayso"]));
 
         assert!(serde_json::from_value::<AppSettings>(stored.clone()).is_err());
 
         let salvaged = salvage_settings(&stored);
         assert_eq!(salvaged.paste_delay_ms, default_paste_delay_ms());
         assert_eq!(salvaged.sound_theme, default_sound_theme());
-        assert_eq!(salvaged.custom_words, vec!["handy".to_string()]);
+        assert_eq!(salvaged.custom_words, vec!["sayso".to_string()]);
     }
 
     #[test]
@@ -1769,14 +1769,14 @@ mod tests {
     #[cfg(not(target_os = "linux"))]
     #[test]
     fn default_overlay_style_is_compact_capsule() {
-        // Voiceless shows the compact capsule by default.
+        // Sayso shows the compact capsule by default.
         let settings = get_default_settings();
         assert_eq!(settings.overlay_style, OverlayStyle::Minimal);
     }
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn voiceless_default_bindings_and_text_model() {
+    fn sayso_default_bindings_and_text_model() {
         let settings = get_default_settings();
         assert_eq!(settings.bindings["transcribe"].current_binding, "fn");
         assert_eq!(

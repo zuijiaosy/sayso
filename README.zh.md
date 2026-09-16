@@ -1,6 +1,8 @@
-# Voiceless
+# Sayso · 顺口说
 
 [English](README.md) | **简体中文**
+
+_顺口一说，即刻上屏。_
 
 本地优先的 macOS 语音输入。按住 Fn 说话，整理好的文字落在光标处。按住 Fn + 左 Shift 说中文，出来的是英文。
 
@@ -29,21 +31,25 @@
 - 不会静默切到云端。本地识别失败就是失败。
 - 翻译失败不会插入原文，悬浮条给「重试」和「复制原文」。
 - 整理失败会插入识别原文，词典替换已经应用过。
-- API Key 以明文存在 `~/Library/Application Support/com.voiceless.desktop/settings_store.json`，迁到钥匙串这件事在计划里。
+- API Key 以明文存在 `~/Library/Application Support/com.sayso.desktop/settings_store.json`，迁到钥匙串这件事在计划里。
 
 ## 安装
 
-1. 构建或下载 `Voiceless.app`，丢进「应用程序」。
+1. 构建或下载 `Sayso.app`，丢进「应用程序」。
 2. GitHub Actions 的构建没有公证。确认安装包来自本仓库后，去掉隔离属性：
 
    ```bash
-   xattr -cr /Applications/Voiceless.app
+   xattr -cr /Applications/Sayso.app
    ```
 
 3. 按提示授予 **麦克风**、**辅助功能**、**输入监控**。
 4. 系统设置 → 键盘 →「按下 🌐 键时」改成 **不执行任何操作**，否则按 Fn 会顺带切输入法。
 5. 选识别方式：下载 Qwen3-ASR 0.6B（约 811 MB）、导入已有的 sherpa-onnx SenseVoice int8 文件夹，或者走云端。
 6. 要整理或翻译的话，在「模型 → 文本模型」填 API Key，点「测试」。
+
+### 从 Voiceless 升级
+
+这个应用原来叫 Voiceless，数据存在 `com.voiceless.desktop`。首次启动时 Sayso 会把那个目录（设置、历史、录音和已下载的模型）整体搬到 `com.sayso.desktop`，不会丢东西，模型也不用重新下。macOS 的权限是跟应用身份绑定的，所以 **麦克风**、**辅助功能**、**输入监控** 需要重新授权一次。
 
 ## 许可
 

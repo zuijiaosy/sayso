@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img">
+  <title>Sayso</title>
+  <defs>
+    <linearGradient id="sayso-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F4633A" />
+      <stop offset="55%" stop-color="#FF8C42" />
+      <stop offset="100%" stop-color="#FFB347" />
+    </linearGradient>
+    <!-- Light falloff from the top edge, the one bit of macOS-style depth. -->
+    <linearGradient id="sayso-sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.20" />
+      <stop offset="45%" stop-color="#fff" stop-opacity="0.04" />
+      <stop offset="100%" stop-color="#fff" stop-opacity="0" />
+    </linearGradient>
+    <filter id="sayso-lift" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#8a2f10"
+        flood-opacity="0.22" />
+    </filter>
+    <!-- The bubble and its tail are visible; the check stroke is punched out of
+         them, so the background gradient reads as the checkmark. Following the
+         check's long arm down past its vertex is exactly where the tail goes. -->
+    <mask id="sayso-bubble">
+      <rect x="44" y="48" width="168" height="124" rx="42" fill="#fff" />
+      <path d="M76 142 L57 201 Q54 209 62 205 L124 172 Z" fill="#fff" />
+      <path d="M86 112 L112 138 L166 80" fill="none" stroke="#000" stroke-width="20"
+        stroke-linecap="round" stroke-linejoin="round" />
+    </mask>
+  </defs>
+  <rect width="256" height="256" rx="58" fill="url(#sayso-bg)" />
+  <g filter="url(#sayso-lift)">
+    <rect width="256" height="256" rx="58" fill="#fff" mask="url(#sayso-bubble)" />
+  </g>
+  <rect width="256" height="256" rx="58" fill="url(#sayso-sheen)" />
+</svg>

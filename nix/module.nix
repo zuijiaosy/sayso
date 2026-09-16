@@ -1,4 +1,4 @@
-# NixOS module for Handy speech-to-text
+# NixOS module for Sayso speech-to-text
 #
 # Handles system-level configuration that the package wrapper cannot:
 #   - udev rule for /dev/uinput (rdev grab() needs it for virtual input)
@@ -7,12 +7,12 @@
 #
 # Usage in your flake:
 #
-#   inputs.handy.url = "github:cjpais/Handy";
+#   inputs.sayso.url = "github:cjpais/Sayso";
 #
 #   nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
 #     modules = [
-#       handy.nixosModules.default
-#       { programs.handy.enable = true; }
+#       sayso.nixosModules.default
+#       { programs.sayso.enable = true; }
 #     ];
 #   };
 {
@@ -22,16 +22,16 @@
   ...
 }:
 let
-  cfg = config.programs.handy;
+  cfg = config.programs.sayso;
 in
 {
-  options.programs.handy = {
-    enable = lib.mkEnableOption "Handy offline speech-to-text";
+  options.programs.sayso = {
+    enable = lib.mkEnableOption "Sayso offline speech-to-text";
 
     package = lib.mkOption {
       type = lib.types.package;
-      defaultText = lib.literalExpression "handy.packages.\${system}.handy";
-      description = "The Handy package to use.";
+      defaultText = lib.literalExpression "sayso.packages.\${system}.sayso";
+      description = "The Sayso package to use.";
     };
   };
 

@@ -96,7 +96,16 @@ mod macos {
             return;
         };
         remove_launch_agent_file(&plugin_launch_agent_path(&home, &app.package_info().name));
+        // Product names this app shipped under before. The plist is keyed on the
+        // product name, so a rename orphans the old one and login would start
+        // the app twice.
+        for legacy in LEGACY_PRODUCT_NAMES {
+            remove_launch_agent_file(&plugin_launch_agent_path(&home, legacy));
+        }
     }
+
+    /// Product names used by earlier releases, newest first.
+    const LEGACY_PRODUCT_NAMES: [&str; 2] = ["Voiceless", "Handy"];
 
     /// Path of the plist the auto-launch crate writes:
     /// `~/Library/LaunchAgents/{app name}.plist`.
@@ -129,17 +138,17 @@ mod macos {
 
         #[test]
         fn launch_agent_path_matches_auto_launch_crate() {
-            let path = plugin_launch_agent_path(Path::new("/Users/someone"), "Handy");
+            let path = plugin_launch_agent_path(Path::new("/Users/someone"), "Sayso");
             assert_eq!(
                 path,
-                Path::new("/Users/someone/Library/LaunchAgents/Handy.plist")
+                Path::new("/Users/someone/Library/LaunchAgents/Sayso.plist")
             );
         }
 
         #[test]
         fn removes_existing_launch_agent() {
             let dir = tempfile::tempdir().unwrap();
-            let plist = dir.path().join("Handy.plist");
+            let plist = dir.path().join("Sayso.plist");
             std::fs::write(&plist, "<plist/>").unwrap();
 
             remove_launch_agent_file(&plist);
@@ -149,7 +158,7 @@ mod macos {
         #[test]
         fn missing_launch_agent_is_a_no_op() {
             let dir = tempfile::tempdir().unwrap();
-            remove_launch_agent_file(&dir.path().join("Handy.plist"));
+            remove_launch_agent_file(&dir.path().join("Sayso.plist"));
         }
     }
 }

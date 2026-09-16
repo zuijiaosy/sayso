@@ -46,7 +46,7 @@ pub fn get_tray_translations(locale: Option<String>) -> TrayStrings {
         _ => language,
     };
 
-    // Voiceless ships only zh and en: Chinese variants without their own
+    // Sayso ships only zh and en: Chinese variants without their own
     // locale fall back to Simplified Chinese before English.
     let chinese = matches!(language, "zh" | "yue");
     exact_match

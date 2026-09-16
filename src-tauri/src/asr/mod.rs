@@ -1,4 +1,4 @@
-//! Cloud speech recognition providers (Voiceless).
+//! Cloud speech recognition providers (Sayso).
 //!
 //! Local recognition stays in `managers::transcription`; this module adds
 //! providers that upload the recorded audio after the user stops speaking.

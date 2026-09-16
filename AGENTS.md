@@ -49,11 +49,25 @@ curl -o src-tauri/resources/models/silero_vad_v4.onnx https://blob.handy.compute
 
 For detailed platform-specific build setup, see [BUILD.md](BUILD.md).
 
+**Brand assets:**
+
+`src/assets/sayso-mark.svg` is the single source of truth for the logo. The app
+icon, the tray glyphs and the in-app `<Logo>` all derive from it, so never hand-edit
+a PNG:
+
+```bash
+bun run icons        # src-tauri/icons/** from the mark (needs rsvg-convert)
+bun run icons:tray   # src-tauri/resources/tray_*.png + the colored Linux set
+```
+
+Tray art is rendered as a macOS template image (`set_icon_with_as_template`), so the
+glyph must stay a solid silhouette with cut-outs — only its alpha channel survives.
+
 ## Architecture Overview
 
-Handy is a cross-platform desktop speech-to-text application built with Tauri 2.x (Rust backend + React/TypeScript frontend).
+Sayso is a cross-platform desktop speech-to-text application built with Tauri 2.x (Rust backend + React/TypeScript frontend).
 
-Voiceless (this fork) targets macOS first. The Rust backend keeps upstream's Windows and Linux support and CI builds macOS ARM64 + Windows x64, but the fork's own additions are macOS-only: Fn / Fn+Left-Shift dictation, chord-cancel, the focus-target copy guard, and reliable paste. Frontend code that touches permissions or key names must branch on `platform()` rather than assuming macOS.
+Sayso (this fork) targets macOS first. The Rust backend keeps upstream's Windows and Linux support and CI builds macOS ARM64 + Windows x64, but the fork's own additions are macOS-only: Fn / Fn+Left-Shift dictation, chord-cancel, the focus-target copy guard, and reliable paste. Frontend code that touches permissions or key names must branch on `platform()` rather than assuming macOS.
 
 ### Backend Structure (src-tauri/src/)
 
@@ -173,7 +187,7 @@ For translation contribution guidelines, see [CONTRIBUTING_TRANSLATIONS.md](CONT
 
 ## CLI Parameters
 
-Handy supports command-line parameters on all platforms for integration with scripts, window managers, and autostart configurations.
+Sayso supports command-line parameters on all platforms for integration with scripts, window managers, and autostart configurations.
 
 **Implementation:** `cli.rs` (definitions), `main.rs` (parsing), `lib.rs` (applying), `signal_handle.rs` (shared logic)
 

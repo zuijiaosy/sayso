@@ -129,7 +129,7 @@ pub async fn transcribe(req: &StepFunAsrRequest, samples: &[f32]) -> Result<Stri
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(90))
-        .user_agent("Voiceless/0.1")
+        .user_agent("Sayso/0.1")
         .build()
         .map_err(|e| AsrError::Network(e.to_string()))?;
 
@@ -225,7 +225,7 @@ mod tests {
             return;
         }
         let mut req = request();
-        req.api_key = "voiceless-invalid-key".into();
+        req.api_key = "sayso-invalid-key".into();
         let result = tauri::async_runtime::block_on(transcribe(&req, &vec![0.0; 16_000]));
         match result {
             Err(AsrError::Http { status, .. }) => {

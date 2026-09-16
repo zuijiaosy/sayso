@@ -1,6 +1,6 @@
 # Baseline (P0)
 
-Voiceless is derived from [Handy](https://github.com/cjpais/Handy) (MIT).
+Sayso is derived from [Handy](https://github.com/cjpais/Handy) (MIT).
 
 | Item                   | Value                                                                  |
 | ---------------------- | ---------------------------------------------------------------------- |

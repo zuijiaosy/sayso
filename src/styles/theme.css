@@ -1,23 +1,34 @@
-/* Handy Colors */
+/* Sayso colors */
 
 :root {
   /* Palette source of truth. Each themed color is defined once as a
      light/dark pair; the active tokens below and the `data-theme` overrides
-     in App.css reference these, so a hex value lives in exactly one place. */
-  /* Voiceless palette: neutral surfaces with a blue accent. */
-  --light-color-text: #111113;
-  --light-color-background: #ffffff;
-  --light-color-logo-primary: #7c9cff;
-  --light-color-logo-stroke: #1d2a4d;
+     further down reference these, so a hex value lives in exactly one place. */
 
-  --dark-color-text: #f5f5f7;
-  --dark-color-background: #1c1c1e;
-  --dark-color-logo-primary: #6b8cff;
-  --dark-color-logo-stroke: #c9d5ff;
+  /* Sayso palette: warm stone surfaces with a single coral accent. The
+     neutrals are deliberately warm (a touch of red/yellow) rather than pure
+     grays — next to the coral, cool grays read as dirty. */
+  --light-color-text: #1f1d1a;
+  --light-color-muted: #7a746b;
+  --light-color-background: #fbfaf7;
+  --light-color-surface: #ffffff;
+  --light-color-surface-2: #f4f1eb;
+  --light-color-border: #e8e3da;
+  --light-color-accent: #f4633a;
+  --light-color-accent-strong: #e0512a;
 
-  /* Semantic status colors. First used by SecureInputWarning; intended to
-     replace the ad-hoc yellow-500/red-500 usages (e.g. ui/Alert.tsx) over
-     time so status styling is themeable from one place. */
+  --dark-color-text: #f3efe8;
+  --dark-color-muted: #9b958b;
+  --dark-color-background: #1a1917;
+  --dark-color-surface: #232220;
+  --dark-color-surface-2: #201f1d;
+  --dark-color-border: #33312d;
+  /* Lifted from the light accent: #f4633a on a near-black surface is too dense
+     to read as the same color. */
+  --dark-color-accent: #ff7a52;
+  --dark-color-accent-strong: #ff8f6b;
+
+  /* Semantic status colors, warmed to sit with the palette above. */
   --light-color-warning: #d97706;
   --light-color-error: #dc2626;
   --dark-color-warning: #fbbf24;
@@ -26,30 +37,56 @@
   --dark-color-success: #4ade80;
 
   /* Tokens that do not change between light and dark */
-  --color-background-ui: #3461f0;
+
+  /* Brand gradient, matching src/assets/sayso-mark.svg. Only the logo and the
+     home hero use it; everything else uses the flat accent. */
+  --color-brand-from: #f4633a;
+  --color-brand-to: #ffb347;
+
+  /* Card tints for the usage metrics. Applied at low opacity over the surface,
+     so these are hues rather than finished colors. */
+  --color-tint-peach: #ff8c5a;
+  --color-tint-butter: #ffc24d;
+  --color-tint-sage: #7db98a;
+  --color-tint-sky: #6fa8dc;
+  --color-tint-lilac: #a58bd6;
+  --color-tint-rose: #e88aa3;
+
   --color-text-stroke: #f6f6f6;
-  --color-mid-gray: #808080;
 
   /* Active palette — defaults to light, follows the OS via the media query
      below, or is forced by `data-theme` (see the overrides below). */
   --color-text: var(--light-color-text);
+  --color-muted: var(--light-color-muted);
   --color-background: var(--light-color-background);
-  --color-logo-primary: var(--light-color-logo-primary);
-  --color-logo-stroke: var(--light-color-logo-stroke);
+  --color-surface: var(--light-color-surface);
+  --color-surface-2: var(--light-color-surface-2);
+  --color-border: var(--light-color-border);
+  --color-accent: var(--light-color-accent);
+  --color-accent-strong: var(--light-color-accent-strong);
   --color-warning: var(--light-color-warning);
   --color-error: var(--light-color-error);
   --color-success: var(--light-color-success);
+
+  /* Opacity the metric-card tints are mixed in at. Dark surfaces need less
+     before a tint turns muddy. */
+  --tint-strength: 14%;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --color-text: var(--dark-color-text);
+    --color-muted: var(--dark-color-muted);
     --color-background: var(--dark-color-background);
-    --color-logo-primary: var(--dark-color-logo-primary);
-    --color-logo-stroke: var(--dark-color-logo-stroke);
+    --color-surface: var(--dark-color-surface);
+    --color-surface-2: var(--dark-color-surface-2);
+    --color-border: var(--dark-color-border);
+    --color-accent: var(--dark-color-accent);
+    --color-accent-strong: var(--dark-color-accent-strong);
     --color-warning: var(--dark-color-warning);
     --color-error: var(--dark-color-error);
     --color-success: var(--dark-color-success);
+    --tint-strength: 10%;
   }
 }
 
@@ -57,7 +94,7 @@
  * Explicit theme override, driven by the `theme` setting via
  * `document.documentElement.dataset.theme`. When set, the higher-specificity
  * attribute selectors win over the `prefers-color-scheme` media query above,
- * so a user can keep Handy light or dark regardless of the OS setting.
+ * so a user can keep Sayso light or dark regardless of the OS setting.
  * `system` (or no attribute) leaves the OS in charge.
  *
  * Lives here (not in App.css) so every window that imports the shared palette —
@@ -65,20 +102,30 @@
  */
 :root[data-theme="light"] {
   --color-text: var(--light-color-text);
+  --color-muted: var(--light-color-muted);
   --color-background: var(--light-color-background);
-  --color-logo-primary: var(--light-color-logo-primary);
-  --color-logo-stroke: var(--light-color-logo-stroke);
+  --color-surface: var(--light-color-surface);
+  --color-surface-2: var(--light-color-surface-2);
+  --color-border: var(--light-color-border);
+  --color-accent: var(--light-color-accent);
+  --color-accent-strong: var(--light-color-accent-strong);
   --color-warning: var(--light-color-warning);
   --color-error: var(--light-color-error);
   --color-success: var(--light-color-success);
+  --tint-strength: 14%;
 }
 
 :root[data-theme="dark"] {
   --color-text: var(--dark-color-text);
+  --color-muted: var(--dark-color-muted);
   --color-background: var(--dark-color-background);
-  --color-logo-primary: var(--dark-color-logo-primary);
-  --color-logo-stroke: var(--dark-color-logo-stroke);
+  --color-surface: var(--dark-color-surface);
+  --color-surface-2: var(--dark-color-surface-2);
+  --color-border: var(--dark-color-border);
+  --color-accent: var(--dark-color-accent);
+  --color-accent-strong: var(--dark-color-accent-strong);
   --color-warning: var(--dark-color-warning);
   --color-error: var(--dark-color-error);
   --color-success: var(--dark-color-success);
+  --tint-strength: 10%;
 }

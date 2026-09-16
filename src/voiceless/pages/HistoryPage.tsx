@@ -16,7 +16,7 @@ import {
   type SessionMode,
 } from "@/bindings";
 import { Button } from "@/components/ui/Button";
-import { Page, Segmented, TextInput } from "../ui";
+import { Chip, Page, Segmented, TextInput } from "../ui";
 
 const PAGE_SIZE = 50;
 
@@ -77,21 +77,21 @@ const EntryRow: React.FC<{ entry: HistoryEntry; showMode: boolean }> = ({
   const text = finalText(entry);
 
   return (
-    <div className="group flex items-start gap-3 py-2.5">
-      <span className="shrink-0 w-11 pt-0.5 text-[12px] tabular-nums text-mid-gray">
+    <div className="group flex items-start gap-3 py-3">
+      <span className="shrink-0 w-11 pt-0.5 text-[12px] tabular-nums text-muted">
         {timeFormat.format(new Date(entry.timestamp * 1000))}
       </span>
       <div className="flex-1 min-w-0 text-[14px] leading-relaxed break-words">
         {text.trim() ? (
           <span className="select-text">{text}</span>
         ) : (
-          <span className="text-mid-gray italic">
+          <span className="text-muted italic">
             {t("voiceless.history.failed")}
           </span>
         )}
         {showMode && entry.mode === "translate" && (
-          <span className="ms-2 align-middle text-[11px] font-medium px-1.5 py-0.5 rounded bg-background-ui/15 text-background-ui">
-            {t("voiceless.history.filterTranslate")}
+          <span className="ms-2 align-middle">
+            <Chip>{t("voiceless.history.filterTranslate")}</Chip>
           </span>
         )}
       </div>
@@ -240,7 +240,7 @@ export const HistoryPage: React.FC = () => {
           <div className="relative min-w-0 flex-1 max-w-[220px]">
             <Search
               size={14}
-              className="absolute start-3 top-1/2 -translate-y-1/2 text-mid-gray pointer-events-none"
+              className="absolute start-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none"
             />
             <TextInput
               className="w-full ps-8"
@@ -253,7 +253,7 @@ export const HistoryPage: React.FC = () => {
         </div>
 
         {groups.length === 0 && !loading && (
-          <p className="py-8 text-center text-[13px] text-mid-gray">
+          <p className="py-8 text-center text-[13px] text-muted">
             {search
               ? t("voiceless.history.noResults")
               : t("voiceless.history.empty")}
@@ -262,10 +262,10 @@ export const HistoryPage: React.FC = () => {
 
         {groups.map((group) => (
           <section key={group.key}>
-            <h2 className="pb-1.5 text-[12px] font-semibold text-mid-gray">
+            <h2 className="pb-1.5 text-[12px] font-semibold text-muted">
               {group.label}
             </h2>
-            <div className="divide-y divide-mid-gray/15 border-t border-mid-gray/15">
+            <div className="bg-surface rounded-card shadow-card px-4 divide-y divide-border">
               {group.items.map((entry) => (
                 <EntryRow
                   key={entry.id}

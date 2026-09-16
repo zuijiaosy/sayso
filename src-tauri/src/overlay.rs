@@ -53,7 +53,7 @@ const OVERLAY_HEIGHT: f64 = 50.0;
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
 
-// Voiceless layouts (logical points; keep in sync with RecordingOverlay.css).
+// Sayso layouts (logical points; keep in sync with RecordingOverlay.css).
 // Translate mode stacks the "Translate to" row above the capsule; opening the
 // language list needs room for the list; a translation failure shows the
 // source text with retry / copy actions.

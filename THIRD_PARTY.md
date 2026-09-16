@@ -1,6 +1,6 @@
 # Third-party notices
 
-Voiceless is distributed under the MIT License (see `LICENSE`). It includes or
+Sayso is distributed under the MIT License (see `LICENSE`). It includes or
 downloads components under their own terms. This list covers the main ones;
 `src-tauri/Cargo.lock` and `bun.lock` are the complete dependency record.
 

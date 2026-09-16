@@ -1768,7 +1768,7 @@ mod tests {
     }
 
     // ---------------------------------------------------------------------
-    // Voiceless: dictate / translate chords (Fn, then Left Shift).
+    // Sayso: dictate / translate chords (Fn, then Left Shift).
     // ---------------------------------------------------------------------
 
     fn chord(binding_id: &str, is_pressed: bool) -> InputEvent {
