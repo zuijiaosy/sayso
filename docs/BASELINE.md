@@ -2,12 +2,12 @@
 
 Voiceless is derived from [Handy](https://github.com/cjpais/Handy) (MIT).
 
-| Item | Value |
-|---|---|
-| Upstream remote | `upstream` → https://github.com/cjpais/Handy.git |
-| Pinned upstream commit | `ba10ce1943ef34e93c09494027fc0b9ced2e8a44` (v0.9.6, 2026-09-15) |
-| Machine | Apple M4, 32 GB, macOS 26.6.2, arm64 |
-| Toolchain | rustc 1.97.0, bun 1.3.14, node 24.18, cmake 4.4.3 (Homebrew), Xcode 26 |
+| Item                   | Value                                                                  |
+| ---------------------- | ---------------------------------------------------------------------- |
+| Upstream remote        | `upstream` → https://github.com/cjpais/Handy.git                       |
+| Pinned upstream commit | `ba10ce1943ef34e93c09494027fc0b9ced2e8a44` (v0.9.6, 2026-09-15)        |
+| Machine                | Apple M4, 32 GB, macOS 26.6.2, arm64                                   |
+| Toolchain              | rustc 1.97.0, bun 1.3.14, node 24.18, cmake 4.4.3 (Homebrew), Xcode 26 |
 
 ## Build commands
 
@@ -33,10 +33,10 @@ so an existing local copy can be imported instead of downloaded.
 ./target/debug/handy --transcribe-file zh.wav --model sense-voice-int8 --json
 ```
 
-| Sample | Audio | Transcribe (debug build) | Result |
-|---|---|---|---|
-| zh.wav | 5.59 s | 473 ms (11.8x RT) | 开放时间早上9点至下午5点。 |
-| en.wav | 7.15 s | 593 ms (12.1x RT) | The tribal chieftain called for the boy and presented him with 50 pieces of code. |
+| Sample | Audio  | Transcribe (debug build) | Result                                                                            |
+| ------ | ------ | ------------------------ | --------------------------------------------------------------------------------- |
+| zh.wav | 5.59 s | 473 ms (11.8x RT)        | 开放时间早上9点至下午5点。                                                        |
+| en.wav | 7.15 s | 593 ms (12.1x RT)        | The tribal chieftain called for the boy and presented him with 50 pieces of code. |
 
 Model load: ~0.4–0.5 s.
 

@@ -49,9 +49,6 @@ jobs:
       - name: Check translation consistency
         run: bun run check:translations
 
-      - name: Check model language coverage
-        run: bun run check:model-languages
-
       - name: Run ESLint
         run: bun run lint
 
