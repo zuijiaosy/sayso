@@ -53,6 +53,8 @@ For detailed platform-specific build setup, see [BUILD.md](BUILD.md).
 
 Handy is a cross-platform desktop speech-to-text application built with Tauri 2.x (Rust backend + React/TypeScript frontend).
 
+Voiceless (this fork) targets macOS first. The Rust backend keeps upstream's Windows and Linux support and CI builds macOS ARM64 + Windows x64, but the fork's own additions are macOS-only: Fn / Fn+Left-Shift dictation, chord-cancel, the focus-target copy guard, and reliable paste. Frontend code that touches permissions or key names must branch on `platform()` rather than assuming macOS.
+
 ### Backend Structure (src-tauri/src/)
 
 - `lib.rs` - Main entry point, Tauri setup, manager initialization

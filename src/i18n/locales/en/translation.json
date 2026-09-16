@@ -949,7 +949,8 @@
       "description": "Voiceless needs these permissions to type into any app.",
       "microphone": {
         "title": "Microphone",
-        "description": "Record your voice."
+        "description": "Record your voice.",
+        "windowsDesc": "Voiceless records through the system microphone. If it is blocked, enable it in Settings → Privacy & security → Microphone, including \"Let desktop apps access your microphone\"."
       },
       "accessibility": {
         "title": "Accessibility",
@@ -975,12 +976,12 @@
       "stepModel": "Step 2: Choose speech recognition",
       "continue": "Continue",
       "back": "Back",
-      "download": "Download SenseVoice",
-      "downloadDesc": "About 152 MB. Offline recognition for Chinese, English, Japanese, Korean and Cantonese.",
+      "download": "Download {{name}}",
+      "downloadDesc": "About {{size}} MB. Offline recognition for 30 languages including Chinese and English, with automatic language detection.",
       "import": "Use an existing model folder",
-      "importDesc": "If you already have the sherpa-onnx SenseVoice int8 model, skip the download.",
+      "importDesc": "If you already have the sherpa-onnx SenseVoice int8 model, use it instead of downloading.",
       "cloud": "Use cloud recognition",
-      "cloudDesc": "Alibaba Cloud or Zhipu GLM; audio is uploaded. Add the API key later under Models.",
+      "cloudDesc": "StepFun, Alibaba Cloud or Zhipu GLM; audio is uploaded. Add the API key later under Models.",
       "finishing": "Enabling the model…"
     },
     "settings": {

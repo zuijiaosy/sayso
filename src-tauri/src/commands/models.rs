@@ -13,6 +13,14 @@ pub async fn get_available_models(
     Ok(model_manager.get_available_models())
 }
 
+/// Registry id of the local model a fresh install is offered, resolved from the
+/// catalog so the frontend never pins the quant-dependent id itself.
+#[tauri::command]
+#[specta::specta]
+pub fn get_default_model_id() -> Option<String> {
+    crate::catalog::default_model_id().map(str::to_string)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn get_model_info(

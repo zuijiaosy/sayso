@@ -1,4 +1,4 @@
-; Custom NSIS template for Handy with portable mode support.
+; Custom NSIS template for Voiceless with portable mode support.
 ; Based on tauri-apps/tauri@tauri-v2.9.1 crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi
 ; Portable changes are marked with "; --- PORTABLE MODE ---" comments.
 ;
@@ -217,7 +217,7 @@ Function PageLeaveInstallType
   ${NSD_GetState} $InstallTypeRadioPortable $0
   ${If} $0 = ${BST_CHECKED}
     StrCpy $PortableMode 1
-    ; --- PORTABLE MODE --- Switch default directory to Desktop\Handy for portable
+    ; --- PORTABLE MODE --- Switch default directory to Desktop\<product> for portable
     ${If} $INSTDIR == "${PLACEHOLDER_INSTALL_DIR}"
     ${OrIf} $INSTDIR == "$LOCALAPPDATA\${PRODUCTNAME}"
       StrCpy $INSTDIR "$DESKTOP\${PRODUCTNAME}"
@@ -597,6 +597,9 @@ Function .onInit
     FileOpen $1 "$INSTDIR\portable" r
     FileRead $1 $2
     FileClose $1
+    ; NOT a branding string: this is the on-disk marker format, read back by
+    ; is_valid_portable_marker() in src/portable.rs. Renaming it would strand
+    ; every existing portable install, so it stays "Handy" after the rebrand.
     ${If} $2 == "Handy Portable Mode"
       StrCpy $PortableMode 1
     ${OrIf} $2 == ""
@@ -768,6 +771,7 @@ Section Install
   ; --- PORTABLE MODE --- Create portable marker and Data directory
   ${If} $PortableMode = 1
     FileOpen $0 "$INSTDIR\portable" w
+    ; Must stay byte-identical to the string src/portable.rs looks for.
     FileWrite $0 "Handy Portable Mode"
     FileClose $0
     CreateDirectory "$INSTDIR\Data"

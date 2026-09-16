@@ -279,11 +279,11 @@ pub enum AsrProviderKind {
 #[serde(rename_all = "snake_case")]
 pub enum CloudAsrProvider {
     /// Alibaba Cloud Model Studio Qwen-ASR.
-    #[default]
     Dashscope,
     /// Zhipu BigModel GLM-ASR.
     Glm,
-    /// StepFun (阶跃星辰) StepAudio ASR.
+    /// StepFun (阶跃星辰) StepAudio ASR. The default for new installs.
+    #[default]
     Stepfun,
 }
 
@@ -1328,6 +1328,18 @@ fn apply_settings_migrations(
         }
     }
 
+    // `cloud_asr_provider` did not exist before GLM was added; back then picking
+    // cloud recognition always meant DashScope. New installs now default to
+    // StepFun, so pin users who were already on cloud to DashScope rather than
+    // silently moving them to a vendor they have no API key for. Users who were
+    // on the local engine are left alone and get the new default if they switch.
+    if settings_value.get("cloud_asr_provider").is_none()
+        && settings.asr_provider == AsrProviderKind::Cloud
+    {
+        settings.cloud_asr_provider = CloudAsrProvider::Dashscope;
+        updated = true;
+    }
+
     let stored_schema_version = settings_value
         .get("settings_schema_version")
         .and_then(|v| v.as_u64())
@@ -1789,15 +1801,47 @@ mod tests {
 
     #[test]
     fn legacy_dashscope_asr_provider_loads_as_cloud_bailian() {
-        let settings: AppSettings =
-            serde_json::from_value(serde_json::json!({ "asr_provider": "dashscope" })).unwrap();
+        let raw = serde_json::json!({ "asr_provider": "dashscope" });
+        let mut settings: AppSettings = serde_json::from_value(raw.clone()).unwrap();
         assert_eq!(settings.asr_provider, AsrProviderKind::Cloud);
-        assert_eq!(settings.cloud_asr_provider, CloudAsrProvider::Dashscope);
         assert_eq!(settings.glm_asr.model, "glm-asr-2512");
         assert_eq!(settings.stepfun_asr.model, "stepaudio-2.5-asr");
         assert_eq!(settings.stepfun_asr.endpoint, "https://api.stepfun.com/v1");
+        // The vendor only survives through the migration: a store this old
+        // predates `cloud_asr_provider`, and the raw default is now StepFun.
+        assert!(apply_settings_migrations(&mut settings, &raw));
+        assert_eq!(settings.cloud_asr_provider, CloudAsrProvider::Dashscope);
         let json = serde_json::to_value(&settings).unwrap();
         assert_eq!(json["asr_provider"], "cloud");
+    }
+
+    #[test]
+    fn fresh_install_defaults_to_stepfun_cloud_vendor() {
+        assert_eq!(
+            get_default_settings().cloud_asr_provider,
+            CloudAsrProvider::Stepfun
+        );
+    }
+
+    #[test]
+    fn local_engine_users_are_not_pinned_to_the_old_cloud_vendor() {
+        // No `cloud_asr_provider` key, but they never chose cloud, so they
+        // should get the current default if they switch to it later.
+        let raw = serde_json::json!({ "asr_provider": "local" });
+        let mut settings: AppSettings = serde_json::from_value(raw.clone()).unwrap();
+        apply_settings_migrations(&mut settings, &raw);
+        assert_eq!(settings.cloud_asr_provider, CloudAsrProvider::Stepfun);
+    }
+
+    #[test]
+    fn an_explicit_cloud_vendor_is_never_overwritten() {
+        let raw = serde_json::json!({
+            "asr_provider": "cloud",
+            "cloud_asr_provider": "glm",
+        });
+        let mut settings: AppSettings = serde_json::from_value(raw.clone()).unwrap();
+        apply_settings_migrations(&mut settings, &raw);
+        assert_eq!(settings.cloud_asr_provider, CloudAsrProvider::Glm);
     }
 
     #[test]

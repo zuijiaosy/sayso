@@ -211,6 +211,26 @@ pub fn rank_of(model_id: &str) -> u32 {
     RANK_BY_ID.get(model_id).copied().unwrap_or(u32::MAX)
 }
 
+/// Hugging Face repo of the local model a fresh install is offered.
+///
+/// Deliberately the repo id, not the registry id: the latter folds in the
+/// default quant's filename (see `ModelDescriptor::from`), so pinning the full
+/// id here would silently stop matching the day `default_quant` changes in
+/// `catalog.json`.
+pub const DEFAULT_MODEL_REPO: &str = "handy-computer/Qwen3-ASR-0.6B-gguf";
+
+/// Registry id of the model offered during onboarding, resolved from the
+/// catalog at runtime. `None` only if the repo above is dropped from the
+/// catalog, which the accompanying unit test guards against.
+pub fn default_model_id() -> Option<&'static str> {
+    CATALOG.iter().find_map(|d| match &d.source {
+        ModelSource::HuggingFace { repo_id, .. } if repo_id == DEFAULT_MODEL_REPO => {
+            Some(d.id.as_str())
+        }
+        _ => None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,6 +240,25 @@ mod tests {
     #[test]
     fn catalog_parses_and_is_nonempty() {
         assert!(!CATALOG.is_empty(), "bundled catalog should contain models");
+    }
+
+    #[test]
+    fn the_onboarding_default_model_resolves() {
+        let id = default_model_id().unwrap_or_else(|| {
+            panic!("catalog must contain the onboarding default repo {DEFAULT_MODEL_REPO}")
+        });
+        // Guards the quant-coupling: the id is only valid while the catalog's
+        // default_quant still points at this file.
+        assert!(id.starts_with(DEFAULT_MODEL_REPO), "unexpected id {id}");
+        let d = CATALOG.iter().find(|d| d.id == id).unwrap();
+        assert!(matches!(d.engine_type, EngineType::TranscribeCpp));
+        assert!(
+            d.caps
+                .languages
+                .as_ref()
+                .is_some_and(|l| l.iter().any(|x| x == "zh")),
+            "the default model must cover Chinese"
+        );
     }
 
     #[test]

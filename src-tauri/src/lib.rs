@@ -758,6 +758,7 @@ pub fn run(cli_args: CliArgs) {
             commands::initialize_enigo,
             commands::initialize_shortcuts,
             commands::models::get_available_models,
+            commands::models::get_default_model_id,
             commands::models::get_model_info,
             commands::models::download_model,
             commands::models::delete_model,

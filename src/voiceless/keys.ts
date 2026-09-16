@@ -1,3 +1,5 @@
+import { platform } from "@tauri-apps/plugin-os";
+
 const MODIFIER_ORDER = [
   "fn",
   "ctrl",
@@ -17,24 +19,51 @@ const BASE_ORDER = (part: string) => {
   return index === -1 ? MODIFIER_ORDER.length : index;
 };
 
-const NAMES: Record<string, string> = {
+const COMMON_NAMES: Record<string, string> = {
   fn: "Fn",
   function: "Fn",
+  shift: "Shift",
+  space: "Space",
+  escape: "Esc",
+  tab: "Tab",
+};
+
+/**
+ * Modifier spellings differ per platform while the backend emits the same
+ * tokens everywhere (`alt`, `super`, ... — see `shortcut/handy_keys.rs`), so
+ * the label table is chosen once at load.
+ */
+const MAC_NAMES: Record<string, string> = {
   ctrl: "Control",
   control: "Control",
   option: "Option",
   alt: "Option",
-  shift: "Shift",
   cmd: "Command",
   command: "Command",
   meta: "Command",
   super: "Command",
-  space: "Space",
-  escape: "Esc",
   enter: "Return",
   return: "Return",
-  tab: "Tab",
   backspace: "Delete",
+};
+
+const PC_NAMES: Record<string, string> = {
+  ctrl: "Ctrl",
+  control: "Ctrl",
+  option: "Alt",
+  alt: "Alt",
+  cmd: "Win",
+  command: "Win",
+  meta: "Win",
+  super: "Win",
+  enter: "Enter",
+  return: "Enter",
+  backspace: "Backspace",
+};
+
+const NAMES: Record<string, string> = {
+  ...COMMON_NAMES,
+  ...(platform() === "macos" ? MAC_NAMES : PC_NAMES),
 };
 
 const labelFor = (part: string): string => {

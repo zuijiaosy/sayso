@@ -512,22 +512,62 @@ jobs:
           chmod +x "$tools_dir/linuxdeploy-${arch}.AppImage"
           "$tools_dir/linuxdeploy-${arch}.AppImage" --appimage-extract-and-run --version
 
+      # These must be genuinely UNSET when not signing, which a job-level `env:`
+      # map cannot express: `${{ ... || '' }}` still DEFINES the variable with an
+      # empty value. tauri-bundler only checks whether APPLE_CERTIFICATE reads
+      # back at all, so an empty-but-defined value made it run `security import`
+      # on an empty blob and fail every unsigned macOS build with
+      # "failed to import keychain certificate". Exporting them here, only when
+      # signing, leaves them absent otherwise so the ad-hoc identity ("-" in
+      # tauri.conf.json) is used instead.
+      - name: Export signing environment
+        if: inputs.sign-binaries
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY: ${{ env.CERT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Only these two are macOS-only; the rest are shared or Windows-only.
+          IS_MACOS: ${{ contains(inputs.platform, 'macos') }}
+        run: |
+          # Heredoc form so multi-line secrets (the updater signing key) survive.
+          emit() {
+            local name="$1" value="$2"
+            [ -n "$value" ] || return 0
+            {
+              printf '%s<<__GH_EOF__\n' "$name"
+              printf '%s\n' "$value"
+              printf '__GH_EOF__\n'
+            } >> "$GITHUB_ENV"
+          }
+          if [ "$IS_MACOS" = "true" ]; then
+            emit APPLE_ID "$APPLE_ID"
+            emit APPLE_ID_PASSWORD "$APPLE_ID_PASSWORD"
+            emit APPLE_PASSWORD "$APPLE_PASSWORD"
+            emit APPLE_TEAM_ID "$APPLE_TEAM_ID"
+            emit APPLE_CERTIFICATE "$APPLE_CERTIFICATE"
+            emit APPLE_CERTIFICATE_PASSWORD "$APPLE_CERTIFICATE_PASSWORD"
+            emit APPLE_SIGNING_IDENTITY "$SIGNING_IDENTITY"
+          fi
+          emit AZURE_CLIENT_ID "$AZURE_CLIENT_ID"
+          emit AZURE_CLIENT_SECRET "$AZURE_CLIENT_SECRET"
+          emit AZURE_TENANT_ID "$AZURE_TENANT_ID"
+          emit TAURI_SIGNING_PRIVATE_KEY "$TAURI_SIGNING_PRIVATE_KEY"
+          emit TAURI_SIGNING_PRIVATE_KEY_PASSWORD "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+
       - name: Build with Tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_ID: ${{ inputs.sign-binaries && secrets.APPLE_ID || '' }}
-          APPLE_ID_PASSWORD: ${{ inputs.sign-binaries && secrets.APPLE_ID_PASSWORD || '' }}
-          APPLE_PASSWORD: ${{ inputs.sign-binaries && secrets.APPLE_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ inputs.sign-binaries && secrets.APPLE_TEAM_ID || '' }}
-          APPLE_CERTIFICATE: ${{ inputs.sign-binaries && secrets.APPLE_CERTIFICATE || '' }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ inputs.sign-binaries && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
-          APPLE_SIGNING_IDENTITY: ${{ inputs.sign-binaries && env.CERT_ID || '' }}
-          AZURE_CLIENT_ID: ${{ inputs.sign-binaries && secrets.AZURE_CLIENT_ID || '' }}
-          AZURE_CLIENT_SECRET: ${{ inputs.sign-binaries && secrets.AZURE_CLIENT_SECRET || '' }}
-          AZURE_TENANT_ID: ${{ inputs.sign-binaries && secrets.AZURE_TENANT_ID || '' }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.sign-binaries && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.sign-binaries && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
           # The Vulkan loader and Wayland client library must come from the host
           # graphics stack. Bundling Ubuntu's copies ahead of the system libraries can
           # prevent a newer distro's Vulkan ICD or Mesa stack from loading.

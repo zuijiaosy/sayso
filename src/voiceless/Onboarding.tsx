@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { platform } from "@tauri-apps/plugin-os";
 import { Cloud, Download, FolderOpen, Loader2 } from "lucide-react";
 import { commands } from "@/bindings";
 import { Button } from "@/components/ui/Button";
 import { useSettings } from "@/hooks/useSettings";
 import { useModelStore } from "@/stores/modelStore";
 import type { PageId } from "./SettingsShell";
-import { importSenseVoiceFolder, SENSE_VOICE_ID } from "./pages/ModelsPage";
+import { importSenseVoiceFolder, useDefaultModelId } from "./pages/ModelsPage";
 import { PermissionRows, usePermissions } from "./pages/permissions";
 import { FnSettingNotice, useFnKeyUsage } from "./pages/HomePage";
 import { Section } from "./ui";
@@ -69,19 +70,24 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
   >(null);
   const finishing = useRef(false);
 
-  const senseVoice = models.find((m) => m.id === SENSE_VOICE_ID);
-  const downloading = SENSE_VOICE_ID in downloadingModels;
+  const defaultModelId = useDefaultModelId();
+  const defaultModel = models.find((m) => m.id === defaultModelId);
+  const downloading =
+    defaultModelId !== null && defaultModelId in downloadingModels;
   const busyAfterDownload =
-    SENSE_VOICE_ID in verifyingModels || SENSE_VOICE_ID in extractingModels;
-  const percent = Math.round(downloadProgress[SENSE_VOICE_ID]?.percentage ?? 0);
+    defaultModelId !== null &&
+    (defaultModelId in verifyingModels || defaultModelId in extractingModels);
+  const percent = Math.round(
+    (defaultModelId ? downloadProgress[defaultModelId]?.percentage : 0) ?? 0,
+  );
 
   const canContinue = Boolean(state.microphone && state.accessibility);
 
   const useLocal = async () => {
-    if (finishing.current) return;
+    if (finishing.current || !defaultModelId) return;
     finishing.current = true;
     await updateSetting("asr_provider", "local");
-    const ok = await selectModel(SENSE_VOICE_ID);
+    const ok = await selectModel(defaultModelId);
     if (!ok) {
       finishing.current = false;
       setPending(null);
@@ -95,13 +101,13 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
   useEffect(() => {
     if (
       pending === "download" &&
-      senseVoice?.is_downloaded &&
+      defaultModel?.is_downloaded &&
       !downloading &&
       !busyAfterDownload
     ) {
       void useLocal();
     }
-  }, [pending, senseVoice?.is_downloaded, downloading, busyAfterDownload]);
+  }, [pending, defaultModel?.is_downloaded, downloading, busyAfterDownload]);
 
   if (step === "permissions") {
     return (
@@ -117,12 +123,17 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
             <PermissionRows state={state} />
           </Section>
         </div>
-        <div className="mt-4">
-          <FnSettingNotice usage={usage} />
-        </div>
-        <p className="text-[13px] text-mid-gray mt-4 leading-relaxed">
-          {t("voiceless.permissions.restartHint")}
-        </p>
+        {/* Fn and the macOS permission model are Apple-only. */}
+        {platform() === "macos" && (
+          <>
+            <div className="mt-4">
+              <FnSettingNotice usage={usage} />
+            </div>
+            <p className="text-[13px] text-mid-gray mt-4 leading-relaxed">
+              {t("voiceless.permissions.restartHint")}
+            </p>
+          </>
+        )}
         <div className="mt-6 flex justify-end">
           <Button
             variant="primary"
@@ -147,13 +158,18 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
           <div className="py-4 flex flex-col gap-3">
             <Choice
               icon={<Download size={20} />}
-              title={t("voiceless.onboarding.download")}
-              description={t("voiceless.onboarding.downloadDesc")}
-              disabled={pending !== null}
+              title={t("voiceless.onboarding.download", {
+                name: defaultModel?.name ?? "",
+              })}
+              description={t("voiceless.onboarding.downloadDesc", {
+                size: defaultModel?.size_mb ?? 0,
+              })}
+              disabled={pending !== null || defaultModelId === null}
               onClick={() => {
+                if (!defaultModelId) return;
                 setPending("download");
-                if (!senseVoice?.is_downloaded)
-                  void downloadModel(SENSE_VOICE_ID);
+                if (!defaultModel?.is_downloaded)
+                  void downloadModel(defaultModelId);
               }}
               trailing={
                 pending === "download" ? (

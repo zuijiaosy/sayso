@@ -949,7 +949,8 @@
       "description": "Voiceless 需要以下权限才能在任意应用中输入文字。",
       "microphone": {
         "title": "麦克风",
-        "description": "录制你的声音。"
+        "description": "录制你的声音。",
+        "windowsDesc": "Voiceless 通过系统麦克风录音。若被阻止，请在「设置 → 隐私和安全性 → 麦克风」中开启，并确保「允许桌面应用访问麦克风」也已打开。"
       },
       "accessibility": {
         "title": "辅助功能",
@@ -975,12 +976,12 @@
       "stepModel": "第 2 步：选择语音识别",
       "continue": "继续",
       "back": "返回",
-      "download": "下载 SenseVoice",
-      "downloadDesc": "约 152 MB。离线识别中文、英文、日语、韩语和粤语。",
+      "download": "下载 {{name}}",
+      "downloadDesc": "约 {{size}} MB。离线识别 30 种语言（含中文和英文），自动判断语种。",
       "import": "使用已有的模型文件夹",
-      "importDesc": "已有 sherpa-onnx SenseVoice int8 模型时，无需重新下载。",
+      "importDesc": "已有 sherpa-onnx SenseVoice int8 模型时，可直接使用，无需下载。",
       "cloud": "使用云端识别",
-      "cloudDesc": "阿里云百炼或智谱 GLM，音频上传识别。稍后在「模型」中填写 API Key。",
+      "cloudDesc": "阶跃星辰、阿里云百炼或智谱 GLM，音频上传识别。稍后在「模型」中填写 API Key。",
       "finishing": "正在启用模型…"
     },
     "settings": {

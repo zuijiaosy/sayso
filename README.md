@@ -4,19 +4,19 @@
 
 Voiceless 派生自开源项目 [Handy](https://github.com/cjpais/Handy)（MIT），复用了它的录音、全局热键、非激活悬浮窗、可靠粘贴和本地模型管理，在此基础上增加了翻译模式、文本模型整理、自定义词典和阿里云百炼云端识别。
 
-> 状态：0.1 开发版，只在 macOS（Apple Silicon）上验证过。
+> 状态：0.1 开发版，只在 macOS（Apple Silicon）上验证过。CI 同时产出 Windows x64 安装包，但 Windows 尚未逐项验证，且以下功能仍是 macOS 独有：Fn 口述与 Fn + 左 Shift 翻译（Fn 在 PC 键盘上是固件级按键）、按下组合键时丢弃录音、目标窗口变化时改用复制、receipt 时序的可靠粘贴。Windows 上请在「快捷键」里改用 `Ctrl+Space` 一类的组合键。
 
 ## 功能
 
-| 功能     | 说明                                                                                                                                  |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| 口述     | 默认 `Fn`。短按开始、再按结束；也可以按住说话、松开结束                                                                               |
-| 翻译     | 默认 `Fn + 左 Shift`。悬浮条上可切换目标语言；先按住 Fn 再按左 Shift，会把正在进行的口述转为翻译                                      |
-| 悬浮条   | 屏幕底部黑色胶囊：✕ 取消、实时波形、✓ 完成；不抢走当前输入框的焦点                                                                    |
-| 语音识别 | 默认本地 SenseVoice（离线，中/英/日/韩/粤）；云端可选阿里云百炼 `qwen3-asr-flash`、智谱 `glm-asr-2512` 或阶跃星辰 `stepaudio-2.5-asr` |
-| 文本模型 | 预设 DeepSeek `deepseek-flash`（已关闭思考模式）、阿里云百炼，以及任意 OpenAI 兼容接口                                                |
-| 口述整理 | 关闭 / 仅纠错 / 整理（默认）                                                                                                          |
-| 词典     | 标准写法、常见误识别（字面替换）、固定译法、备注；支持文本导入导出                                                                    |
+| 功能     | 说明                                                                                                                                                                          |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 口述     | 默认 `Fn`。短按开始、再按结束；也可以按住说话、松开结束                                                                                                                       |
+| 翻译     | 默认 `Fn + 左 Shift`。悬浮条上可切换目标语言；先按住 Fn 再按左 Shift，会把正在进行的口述转为翻译                                                                              |
+| 悬浮条   | 屏幕底部黑色胶囊：✕ 取消、实时波形、✓ 完成；不抢走当前输入框的焦点                                                                                                            |
+| 语音识别 | 默认本地 Qwen3-ASR 0.6B（离线，30 种语言，自动判断语种）；也可换回 SenseVoice。云端默认阶跃星辰 `stepaudio-2.5-asr`，另可选阿里云百炼 `qwen3-asr-flash` 或智谱 `glm-asr-2512` |
+| 文本模型 | 预设 DeepSeek `deepseek-flash`（已关闭思考模式）、阿里云百炼，以及任意 OpenAI 兼容接口                                                                                        |
+| 口述整理 | 关闭 / 仅纠错 / 整理（默认）                                                                                                                                                  |
+| 词典     | 标准写法、常见误识别（字面替换）、固定译法、备注；支持文本导入导出                                                                                                            |
 
 ## 数据去向
 
@@ -42,7 +42,7 @@ Voiceless 派生自开源项目 [Handy](https://github.com/cjpais/Handy)（MIT�
 
 3. 打开后按引导授予 **麦克风**、**辅助功能**、**输入监控**。
 4. 系统设置 → 键盘 →「按下 🌐 键时」改为 **不执行任何操作**，否则按 Fn 会同时切换输入法。
-5. 选择语音识别：下载 SenseVoice（约 152 MB）、导入已有的 sherpa-onnx SenseVoice int8 文件夹，或使用云端识别（阿里云百炼 / 智谱 GLM / 阶跃星辰 StepAudio）。
+5. 选择语音识别：下载 Qwen3-ASR 0.6B（约 811 MB）、导入已有的 sherpa-onnx SenseVoice int8 文件夹，或使用云端识别（默认阶跃星辰 StepAudio，也可选阿里云百炼 / 智谱 GLM）。
 6. 如需整理或翻译，在「模型 → 文本模型」填写 DeepSeek 或其他服务的 API Key，点「测试」。
 
 **已知限制**
@@ -67,11 +67,18 @@ bun run lint && bunx tsc --noEmit                         # 前端检查
 
 在系统设置里授权时，请使用打包后的 `.app`：开发模式下运行的是裸二进制，系统设置的权限列表里找不到它。
 
-**签名与打包。** 用固定的签名身份构建，macOS 才会在重新安装后保留辅助功能和输入监控授权；自签名（`-`）每次构建都会让授权失效。
+**签名与打包。** 用固定的签名身份构建，macOS 才会在重新安装后保留辅助功能和输入监控授权；自签名（`-`）每次构建都会让授权失效。`tauri.conf.json` 默认仍是自签名，这样没有证书的环境（含 CI）也能构建；本机构建请用：
 
 ```bash
-security find-identity -v -p codesigning        # 找到你的签名身份
-APPLE_SIGNING_IDENTITY="<身份 SHA-1>" CMAKE_POLICY_VERSION_MINIMUM=3.5 bun run tauri build --bundles app
+bun run build:signed                     # 自动挑选钥匙串里的签名身份并打包 .app
+bun run build:signed -- --bundles app,dmg   # 需要 dmg 时
+APPLE_SIGNING_IDENTITY="<身份 SHA-1>" bun run build:signed   # 指定某个身份
+```
+
+脚本优先使用 `Developer ID Application`，没有则用 `Apple Development`，并把身份通过 `--config` 合并进打包配置，不会把个人证书写进仓库。第一次从自签名换成正式身份时，系统仍会要求重新授权一次，之后的构建就能保留。
+
+```bash
+security find-identity -v -p codesigning        # 查看可用的签名身份
 # Tauri 的 dmg 脚本需要控制访达；也可以直接用 hdiutil：
 cd src-tauri/target/release/bundle && mkdir dmg-stage && ditto macos/Voiceless.app dmg-stage/Voiceless.app \
   && ln -s /Applications dmg-stage/Applications \

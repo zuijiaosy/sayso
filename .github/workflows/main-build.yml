@@ -1,7 +1,7 @@
 name: "Main Branch Build"
 
-# Builds the macOS Apple Silicon installer on every push to main so each commit
-# has a downloadable build. Artifacts are kept for 30 days.
+# Builds the macOS Apple Silicon and Windows x64 installers on every push to
+# main so each commit has a downloadable build. Artifacts are kept for 30 days.
 #
 # Binaries are unsigned: macOS gets Tauri's ad-hoc signature ("-" in
 # tauri.conf.json), Windows gets no Authenticode signature. Signing needs the
@@ -18,14 +18,28 @@ concurrency:
 
 jobs:
   build:
-    name: "Build macOS ARM64"
+    name: "Build ${{ matrix.name }}"
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "macOS ARM64"
+            platform: "macos-26"
+            target: "aarch64-apple-darwin"
+            args: "--target aarch64-apple-darwin"
+          - name: "Windows x64"
+            platform: "windows-latest"
+            target: "x86_64-pc-windows-msvc"
+            # No --target: the Windows host toolchain already builds x64, and
+            # build.yml skips `rustup target add` for this triple.
+            args: ""
     uses: ./.github/workflows/build.yml
     with:
-      platform: "macos-26"
-      target: "aarch64-apple-darwin"
-      build-args: "--target aarch64-apple-darwin"
+      platform: ${{ matrix.platform }}
+      target: ${{ matrix.target }}
+      build-args: ${{ matrix.args }}
       asset-prefix: "voiceless"
       upload-artifacts: true
       sign-binaries: false
@@ -46,12 +60,19 @@ jobs:
           cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
           ## Voiceless installers
 
-          Download the macOS Apple Silicon installer from the **Artifacts** section of this workflow run.
+          Download them from the **Artifacts** section of this workflow run:
+
+          | Artifact | Contents |
+          | --- | --- |
+          | `voiceless-aarch64-apple-darwin` | macOS Apple Silicon `.dmg` and `.app` |
+          | `voiceless-x86_64-pc-windows-msvc` | Windows x64 `.msi` and NSIS `.exe` |
 
           The GitHub Actions builds are unsigned. After moving the macOS app to `/Applications`, verify that it came from this repository, then run:
 
           ```bash
           xattr -cr /Applications/Voiceless.app
           ```
+
+          Windows has no Authenticode signature, so SmartScreen will warn on first run.
           EOF
           echo "Build result: ${BUILD_RESULT}" >> "$GITHUB_STEP_SUMMARY"

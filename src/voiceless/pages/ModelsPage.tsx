@@ -36,24 +36,40 @@ import {
 
 export const SENSE_VOICE_ID = "sense-voice-int8";
 
+/**
+ * Registry id of the model a fresh install is offered. Resolved from the
+ * catalog by the backend because the id folds in the default quant's filename,
+ * so hardcoding it here would break the day that quant changes.
+ */
+export const useDefaultModelId = (): string | null => {
+  const [id, setId] = useState<string | null>(null);
+  useEffect(() => {
+    void commands.getDefaultModelId().then(setId);
+  }, []);
+  return id;
+};
+
 const isUrlSource = (m: ModelInfo) =>
   typeof m.source === "object" && "Url" in m.source;
 const supportsChinese = (m: ModelInfo) =>
   m.supported_languages.some((l) => l === "zh" || l.startsWith("zh"));
 
-/** Chinese-capable local models, SenseVoice first, then downloaded ones. */
+/** Chinese-capable local models, the default first, then downloaded ones. */
 export const useChineseModels = () => {
   const { models } = useModelStore();
+  const defaultId = useDefaultModelId();
   return useMemo(() => {
     const list = models.filter(
       (m) =>
         supportsChinese(m) &&
+        // SenseVoice ships as a Url source and stays listed even before it is
+        // downloaded, so the import flow can still reach it.
         (!isUrlSource(m) || m.id === SENSE_VOICE_ID || m.is_downloaded),
     );
     const rank = (m: ModelInfo) =>
-      m.id === SENSE_VOICE_ID ? 0 : m.is_downloaded ? 1 : 2;
+      m.id === defaultId ? 0 : m.is_downloaded ? 1 : 2;
     return [...list].sort((a, b) => rank(a) - rank(b));
-  }, [models]);
+  }, [models, defaultId]);
 };
 
 export const importSenseVoiceFolder = async (
@@ -74,7 +90,10 @@ export const importSenseVoiceFolder = async (
   return true;
 };
 
-const ModelRow: React.FC<{ model: ModelInfo }> = ({ model }) => {
+const ModelRow: React.FC<{
+  model: ModelInfo;
+  defaultModelId: string | null;
+}> = ({ model, defaultModelId }) => {
   const { t } = useTranslation();
   const {
     currentModel,
@@ -166,7 +185,7 @@ const ModelRow: React.FC<{ model: ModelInfo }> = ({ model }) => {
       title={
         <span className="flex items-center gap-2 min-w-0">
           <span className="truncate">{model.name}</span>
-          {model.id === SENSE_VOICE_ID && (
+          {model.id === defaultModelId && (
             <span className="shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded bg-background-ui/15 text-background-ui">
               {t("voiceless.models.local.recommended")}
             </span>
@@ -190,6 +209,7 @@ const ModelRow: React.FC<{ model: ModelInfo }> = ({ model }) => {
 const LocalModels: React.FC = () => {
   const { t } = useTranslation();
   const models = useChineseModels();
+  const defaultModelId = useDefaultModelId();
   const { rescanLocalModels, isRescanning } = useModelStore();
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? models : models.slice(0, 5);
@@ -200,7 +220,11 @@ const LocalModels: React.FC = () => {
         <Row title={t("voiceless.models.local.empty")} />
       )}
       {visible.map((model) => (
-        <ModelRow key={model.id} model={model} />
+        <ModelRow
+          key={model.id}
+          model={model}
+          defaultModelId={defaultModelId}
+        />
       ))}
       <div className="py-3 flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -453,7 +477,7 @@ const HotwordVendorForm: React.FC<{
 const CloudAsrSection: React.FC = () => {
   const { t } = useTranslation();
   const { settings, refreshSettings } = useSettings();
-  const vendor: CloudAsrProvider = settings?.cloud_asr_provider ?? "dashscope";
+  const vendor: CloudAsrProvider = settings?.cloud_asr_provider ?? "stepfun";
   const [testing, setTesting] = useState(false);
 
   const test = async () => {

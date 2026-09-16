@@ -826,6 +826,13 @@ async getAvailableModels() : Promise<Result<ModelInfo[], string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Registry id of the local model a fresh install is offered, resolved from the
+ * catalog so the frontend never pins the quant-dependent id itself.
+ */
+async getDefaultModelId() : Promise<string | null> {
+    return await TAURI_INVOKE("get_default_model_id");
+},
 async getModelInfo(modelId: string) : Promise<Result<ModelInfo | null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_model_info", { modelId }) };
@@ -1257,7 +1264,7 @@ export type CloudAsrProvider =
  */
 "glm" | 
 /**
- * StepFun (阶跃星辰) StepAudio ASR.
+ * StepFun (阶跃星辰) StepAudio ASR. The default for new installs.
  */
 "stepfun"
 export type CustomSounds = { start: boolean; stop: boolean }
