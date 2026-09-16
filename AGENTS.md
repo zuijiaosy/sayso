@@ -205,7 +205,9 @@ Access debug features: `Cmd+Shift+D` (macOS) or `Ctrl+Shift+D` (Windows/Linux)
 
 ## Troubleshooting
 
-See the [Troubleshooting](README.md#troubleshooting) section in README.md.
+See [Known limitations](README.md#known-limitations) in README.md. The Chinese
+translation of the same document is [README.zh.md](README.zh.md); keep the two in
+sync when you change either.
 
 ## GitHub workflow for AI coding assistants
 

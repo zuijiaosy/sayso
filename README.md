@@ -1,110 +1,116 @@
 # Voiceless
 
-本地优先的 macOS 语音输入工具，交互参考 Typeless：**按 Fn 说话，整理好的文字出现在光标处；按 Fn + 左 Shift 说中文，插入地道的译文。**
+**English** | [简体中文](README.zh.md)
 
-Voiceless 派生自开源项目 [Handy](https://github.com/cjpais/Handy)（MIT），复用了它的录音、全局热键、非激活悬浮窗、可靠粘贴和本地模型管理，在此基础上增加了翻译模式、文本模型整理、自定义词典和阿里云百炼云端识别。
+Local-first voice input for macOS. Hold Fn and talk, clean text lands at your cursor. Hold Fn + Left Shift and talk in Chinese, English comes out.
 
-> 状态：0.1 开发版，只在 macOS（Apple Silicon）上验证过。CI 同时产出 Windows x64 安装包，但 Windows 尚未逐项验证，且以下功能仍是 macOS 独有：Fn 口述与 Fn + 左 Shift 翻译（Fn 在 PC 键盘上是固件级按键）、按下组合键时丢弃录音、目标窗口变化时改用复制、receipt 时序的可靠粘贴。Windows 上请在「快捷键」里改用 `Ctrl+Space` 一类的组合键。
+Forked from [Handy](https://github.com/cjpais/Handy) (MIT). Recording, global hotkeys, the non-activating overlay, reliable paste and model management come from there. Translation mode, text-model cleanup, the dictionary and cloud recognition are new.
 
-## 功能
+> 0.1 dev build. Only tested on macOS (Apple Silicon).
+>
+> CI builds a Windows x64 installer, but nobody has gone through it feature by feature. Fn dictation, chord-cancel, the copy-instead-of-paste guard and reliable paste are macOS-only. On Windows bind `Ctrl+Space` or similar under Shortcuts.
 
-| 功能     | 说明                                                                                                                                                                          |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 口述     | 默认 `Fn`。短按开始、再按结束；也可以按住说话、松开结束                                                                                                                       |
-| 翻译     | 默认 `Fn + 左 Shift`。悬浮条上可切换目标语言；先按住 Fn 再按左 Shift，会把正在进行的口述转为翻译                                                                              |
-| 悬浮条   | 屏幕底部黑色胶囊：✕ 取消、实时波形、✓ 完成；不抢走当前输入框的焦点                                                                                                            |
-| 语音识别 | 默认本地 Qwen3-ASR 0.6B（离线，30 种语言，自动判断语种）；也可换回 SenseVoice。云端默认阶跃星辰 `stepaudio-2.5-asr`，另可选阿里云百炼 `qwen3-asr-flash` 或智谱 `glm-asr-2512` |
-| 文本模型 | 预设 DeepSeek `deepseek-flash`（已关闭思考模式）、阿里云百炼，以及任意 OpenAI 兼容接口                                                                                        |
-| 口述整理 | 关闭 / 仅纠错 / 整理（默认）                                                                                                                                                  |
-| 词典     | 标准写法、常见误识别（字面替换）、固定译法、备注；支持文本导入导出                                                                                                            |
+## Features
 
-## 数据去向
+| Feature     | Notes                                                                                                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Dictation   | `Fn`. Tap to start, tap to stop. Or hold to talk, release to finish.                                                                                                                 |
+| Translation | `Fn + Left Shift`. Target language switches from the overlay. Hold Fn then add Left Shift to turn a running dictation into a translation.                                            |
+| Overlay     | Black pill at the bottom of the screen: ✕ cancel, live waveform, ✓ done. Never takes focus from the field you are typing into.                                                       |
+| Recognition | Local Qwen3-ASR 0.6B (offline, 30 languages, auto language detect). SenseVoice still available. Cloud: StepFun `stepaudio-2.5-asr`, Alibaba `qwen3-asr-flash`, Zhipu `glm-asr-2512`. |
+| Text model  | DeepSeek `deepseek-flash` (thinking off), Alibaba Cloud, or any OpenAI-compatible endpoint.                                                                                          |
+| Cleanup     | Off / fix only / polish (default).                                                                                                                                                   |
+| Dictionary  | Preferred spellings, common misrecognitions, fixed translations, notes. Import and export as text.                                                                                   |
 
-| 配置                           | 音频             | 文字                           |
-| ------------------------------ | ---------------- | ------------------------------ |
-| 本地识别，整理关闭             | 不出本机         | 不出本机                       |
-| 本地识别 + DeepSeek 等文本模型 | 不出本机         | 识别结果和相关词条发往所选服务 |
-| 云端识别（百炼 / 智谱 / 阶跃） | 上传到所选服务商 | 取决于文本模型设置             |
+## Where your data goes
 
-- **不会静默切换到云端。** 本地识别失败时不会自动改用云端。
-- **翻译失败时不会插入原文。** 悬浮条会给出「重试」和「复制原文」。
-- **整理失败时插入识别原文。** 口述整理出错或超时，直接插入识别出的文字（已应用词典替换）。
-- **API Key 保存在本机设置文件中。** 当前版本以明文保存在 `~/Library/Application Support/com.voiceless.desktop/settings_store.json`，计划后续迁移到钥匙串。
+| Setup                       | Audio       | Text                                     |
+| --------------------------- | ----------- | ---------------------------------------- |
+| Local, cleanup off          | stays local | stays local                              |
+| Local + DeepSeek or similar | stays local | transcript + matching dictionary entries |
+| Cloud recognition           | uploaded    | depends on your text-model setting       |
 
-## 安装与首次使用
+- No silent cloud fallback. If local recognition fails, it fails.
+- A failed translation never inserts the original. You get Retry and Copy original.
+- A failed cleanup inserts the raw transcript, dictionary replacements included.
+- API keys sit in plain text in `~/Library/Application Support/com.voiceless.desktop/settings_store.json`. Keychain is on the list.
 
-1. 构建或下载 `Voiceless.app`，放进「应用程序」文件夹。
-2. 从 GitHub Actions 下载的 macOS 安装包没有 Apple 公证。确认安装包来自本仓库后，在终端执行以下命令移除隔离属性：
+## Install
+
+1. Build or download `Voiceless.app`, drop it in Applications.
+2. GitHub Actions builds are not notarized. Check the download came from this repo, then clear quarantine:
 
    ```bash
    xattr -cr /Applications/Voiceless.app
    ```
 
-3. 打开后按引导授予 **麦克风**、**辅助功能**、**输入监控**。
-4. 系统设置 → 键盘 →「按下 🌐 键时」改为 **不执行任何操作**，否则按 Fn 会同时切换输入法。
-5. 选择语音识别：下载 Qwen3-ASR 0.6B（约 811 MB）、导入已有的 sherpa-onnx SenseVoice int8 文件夹，或使用云端识别（默认阶跃星辰 StepAudio，也可选阿里云百炼 / 智谱 GLM）。
-6. 如需整理或翻译，在「模型 → 文本模型」填写 DeepSeek 或其他服务的 API Key，点「测试」。
+3. Grant **Microphone**, **Accessibility** and **Input Monitoring** when asked.
+4. System Settings → Keyboard → "Press 🌐 key to" → **Do Nothing**. Otherwise Fn also cycles input sources.
+5. Pick recognition: download Qwen3-ASR 0.6B (~811 MB), import an existing sherpa-onnx SenseVoice int8 folder, or go cloud.
+6. For cleanup or translation, add an API key under Models → Text model and hit Test.
 
-**已知限制**
+**Known limitations**
 
-- Fn 键只在 Apple 键盘上有效，第三方键盘请在「快捷键」里「添加另一个」。
-- 未使用固定签名身份构建时，每次重新安装后都要重新授予辅助功能和输入监控权限。
-- 密码框等「安全输入」场景下，系统会阻止模拟粘贴。
-- 智谱 GLM-ASR 的多个热词如何编码，官方文档没有写明。Voiceless 按官方 SDK 的方式发送，被服务端拒绝时会自动去掉热词重试。
-- 阶跃星辰的 Step Plan 订阅密钥不能调用 `/v1/audio/transcriptions`，需要改用按量付费密钥。该模型仅支持中英文。
+- Fn only exists on Apple keyboards. Third-party keyboard: use "Add another" under Shortcuts.
+- Build without a stable signing identity and you re-grant Accessibility and Input Monitoring after every install.
+- Password fields and other secure-input contexts block simulated paste. Nothing to do about it.
+- Zhipu never documented how multiple GLM-ASR hotwords are encoded. We send them the way the official SDK does, and retry without hotwords on rejection.
+- StepFun Step Plan keys cannot call `/v1/audio/transcriptions`. Use a pay-as-you-go key. Chinese and English only.
+- Downloads try Hugging Face, then hf-mirror.com, then the catalog mirrors. If you reach Hugging Face through a proxy, hf-mirror will not help: it bounces non-mainland clients back to the origin.
 
-## 开发
+## Development
 
-需要 Rust、Bun、Xcode Command Line Tools、CMake。
+Rust, Bun, Xcode Command Line Tools, CMake.
 
 ```bash
 bun install
-CMAKE_POLICY_VERSION_MINIMUM=3.5 bun run tauri dev      # 开发运行（权限会记在终端上）
-CMAKE_POLICY_VERSION_MINIMUM=3.5 bun run tauri build --bundles app,dmg   # 打包
-cd src-tauri && cargo test --lib                          # Rust 单元测试
-bun run lint && bunx tsc --noEmit                         # 前端检查
+CMAKE_POLICY_VERSION_MINIMUM=3.5 bun run tauri dev      # dev run; permissions attach to the terminal
+CMAKE_POLICY_VERSION_MINIMUM=3.5 bun run tauri build --bundles app,dmg
+cd src-tauri && cargo test --lib                          # Rust tests
+bun run lint && bunx tsc --noEmit                         # frontend checks
 ```
 
-在系统设置里授权时，请使用打包后的 `.app`：开发模式下运行的是裸二进制，系统设置的权限列表里找不到它。
+Grant permissions to the packaged `.app`, not the dev build. Dev mode runs a bare binary that never shows up in the permission lists.
 
-**签名与打包。** 用固定的签名身份构建，macOS 才会在重新安装后保留辅助功能和输入监控授权；自签名（`-`）每次构建都会让授权失效。`tauri.conf.json` 默认仍是自签名，这样没有证书的环境（含 CI）也能构建；本机构建请用：
+**Signing.** macOS keeps Accessibility and Input Monitoring across reinstalls only if the signing identity is stable. Ad-hoc (`-`) invalidates them every build. `tauri.conf.json` stays ad-hoc so CI and anyone without a certificate can still build. Locally:
 
 ```bash
-bun run build:signed                     # 自动挑选钥匙串里的签名身份并打包 .app
-bun run build:signed -- --bundles app,dmg   # 需要 dmg 时
-APPLE_SIGNING_IDENTITY="<身份 SHA-1>" bun run build:signed   # 指定某个身份
+bun run build:signed                        # picks an identity from the keychain
+bun run build:signed -- --bundles app,dmg
+APPLE_SIGNING_IDENTITY="<sha-1>" bun run build:signed
 ```
 
-脚本优先使用 `Developer ID Application`，没有则用 `Apple Development`，并把身份通过 `--config` 合并进打包配置，不会把个人证书写进仓库。第一次从自签名换成正式身份时，系统仍会要求重新授权一次，之后的构建就能保留。
+Prefers `Developer ID Application`, falls back to `Apple Development`. The identity goes in through `--config`, so no personal certificate lands in the repo. Switching from ad-hoc costs one last re-grant.
 
 ```bash
-security find-identity -v -p codesigning        # 查看可用的签名身份
-# Tauri 的 dmg 脚本需要控制访达；也可以直接用 hdiutil：
+security find-identity -v -p codesigning
+# Tauri's dmg step wants Finder control. hdiutil does the job too:
 cd src-tauri/target/release/bundle && mkdir dmg-stage && ditto macos/Voiceless.app dmg-stage/Voiceless.app \
   && ln -s /Applications dmg-stage/Applications \
   && hdiutil create -volname Voiceless -srcfolder dmg-stage -ov -format UDZO dmg/Voiceless_0.1.0_aarch64.dmg \
   && rm -rf dmg-stage
 ```
 
-可选的联网测试，使用无效 Key 验证服务端点：
+Live tests hit the real endpoints with an invalid key:
 
 ```bash
 cd src-tauri && VOICELESS_LIVE_TESTS=1 cargo test --lib live_ -- --ignored
 ```
 
-主要代码位置：
+Code map:
 
-| 路径                                         | 内容                                                                                                                                                                  |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src-tauri/src/voice.rs`                     | 模式、提示词、词典替换、模型输出校验                                                                                                                                  |
-| `src-tauri/src/actions.rs`                   | 录音结束后的识别 → 整理/翻译 → 粘贴流水线                                                                                                                             |
-| `src-tauri/src/transcription_coordinator.rs` | 热键状态机（含 Fn → Fn+Shift 升级）                                                                                                                                   |
-| `src-tauri/src/asr/`                         | 云端识别适配器：百炼 Qwen-ASR（单次 ≤10 MB，按 3 分钟分段）、智谱 GLM-ASR（单次 ≤30 秒，按 28 秒分段并行）、阶跃星辰 StepAudio ASR（单次 ≤100 MB，按 3 分钟分段并行） |
-| `src/voiceless/`                             | 设置界面与首次引导                                                                                                                                                    |
-| `src/overlay/`                               | 录音悬浮条                                                                                                                                                            |
+| Path                                         | What                                                                                                                                                               |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src-tauri/src/voice.rs`                     | Modes, prompts, dictionary replacement, output validation                                                                                                          |
+| `src-tauri/src/actions.rs`                   | Recognize → clean up or translate → paste                                                                                                                          |
+| `src-tauri/src/transcription_coordinator.rs` | Hotkey state machine, including the Fn → Fn+Shift upgrade                                                                                                          |
+| `src-tauri/src/asr/`                         | Cloud adapters. Alibaba Qwen-ASR (≤10 MB, 3-min chunks), Zhipu GLM-ASR (≤30 s, 28-s chunks in parallel), StepFun StepAudio ASR (≤100 MB, 3-min chunks in parallel) |
+| `src-tauri/src/catalog/`                     | Bundled model catalog, resolver for the default local model                                                                                                        |
+| `src/voiceless/`                             | Settings UI and onboarding                                                                                                                                         |
+| `src/overlay/`                               | Recording overlay                                                                                                                                                  |
 
-更多背景见 `docs/typeless-local-plan.md` 和 `docs/BASELINE.md`；上游 Handy 的原始说明保存在 `docs/UPSTREAM_HANDY_README.md`。
+Background reading: `docs/typeless-local-plan.md`, `docs/BASELINE.md`. Handy's original README is kept at `docs/UPSTREAM_HANDY_README.md`.
 
-## 许可
+## License
 
-应用代码使用 MIT 许可，见 `LICENSE`。第三方组件和模型权重的许可见 `THIRD_PARTY.md`。
+MIT, see `LICENSE`. Third-party components and model weights: `THIRD_PARTY.md`.
