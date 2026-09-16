@@ -492,6 +492,27 @@ impl Drop for RescanGuard {
     }
 }
 
+/// Community mirror of huggingface.co, tried after the primary endpoint fails.
+/// It serves the same `/{repo}/resolve/{rev}/{file}` paths, so hf-hub works
+/// against it unchanged when it does proxy.
+///
+/// Measured caveats, so nobody expects more of this than it delivers:
+/// it answers clients it does not consider mainland-Chinese with a 308 back to
+/// huggingface.co, and hf-hub's redirect policy stops at cross-host redirects,
+/// so `metadata()` then fails on the missing `x-repo-commit` and we fall
+/// through to the catalog mirrors. Even when it does proxy, Xet-backed repos
+/// still stream their payload from HF's own CDN. This is a cheap extra try for
+/// networks that cannot reach huggingface.co at all, not a throughput fix.
+const HF_MIRROR_ENDPOINT: &str = "https://hf-mirror.com";
+
+/// Result of running one endpoint's retry schedule. `Failed` carries the error
+/// instead of propagating it so the caller can try another endpoint or a mirror.
+enum HfAttemptOutcome {
+    Completed,
+    Cancelled,
+    Failed(anyhow::Error),
+}
+
 /// RAII guard that cleans up download state (`is_downloading` flag and cancel flag)
 /// when dropped, unless explicitly disarmed. This ensures consistent cleanup on
 /// every error path without requiring manual cleanup at each `?` or `return Err`.
@@ -1942,177 +1963,59 @@ impl ModelManager {
             model_id, repo_id, revision, filename
         );
 
-        // hf-hub has no working internal retry (its retry knobs are hardcoded
-        // to zero), so a single transient fault — dropped connection, a 429
-        // from the resolve endpoint, a CDN blip — would otherwise fail the
-        // whole download. Each attempt resumes from the `.sync.part`
-        // committed-offset marker, so a retry only re-fetches what the failed
-        // attempt hadn't finished.
-        // Start moderately parallel for normal-network throughput, then stay
-        // sequential after the first failure. Eight simultaneous connections
-        // were all reset on an affected network in #1579, while one stream
-        // succeeded; four is a less aggressive fast path, and every retry uses
-        // the known-compatible request pattern.
-        const ATTEMPT_STREAMS: [usize; 4] = [4, 1, 1, 1];
-        let mut attempt: usize = 1;
-        let hf_error = loop {
-            let stream_count = ATTEMPT_STREAMS[attempt - 1];
-            info!(
-                "HF download attempt {}/{} for {} using {} concurrent stream(s)",
-                attempt,
-                ATTEMPT_STREAMS.len(),
-                model_id,
-                stream_count
-            );
-
-            // Fresh client per attempt so a wedged connection from the previous
-            // try can't poison the retry.
-            let api = ApiBuilder::from_env()
-                // Ignore cached and environment-provided credentials. A stale token
-                // can make otherwise-public downloads fail authentication.
-                .with_token(None)
-                .with_progress(false)
-                .with_max_files(stream_count)
-                .build()
-                .map_err(|e| anyhow::anyhow!("Failed to init Hugging Face API: {}", e))?;
-            let repo = api.repo(Repo::with_revision(
-                repo_id.clone(),
-                RepoType::Model,
-                revision.clone(),
-            ));
-            let progress = HfDownloadProgress::new(self.app_handle.clone(), model_id.clone());
-
-            // hf-hub has no internal timeouts, so a wedged connection would
-            // otherwise hang this attempt forever and neither the retry loop
-            // nor the mirror fallback would ever fire. The watchdog cancels a
-            // per-attempt child token when progress goes stale; a user cancel
-            // on the parent propagates through the same child.
-            let attempt_token = cancel_token.child_token();
-            let watchdog = tokio::spawn({
-                let probe = progress.clone();
-                let attempt_token = attempt_token.clone();
-                async move {
-                    loop {
-                        tokio::time::sleep(Duration::from_secs(5)).await;
-                        if attempt_token.is_cancelled() {
-                            break;
-                        }
-                        if probe.last_activity().elapsed() > DOWNLOAD_STALL_TIMEOUT {
-                            attempt_token.cancel();
-                            break;
-                        }
-                    }
-                }
-            });
-            // hf-hub only observes its token inside the chunk loop — the
-            // metadata/resolve request and cache lock run before it, so a hang
-            // there would ignore the cancel entirely. Race the whole future
-            // against the token: on cancel, grant a short grace so an attempt
-            // that IS in the chunk loop can unwind gracefully (committing the
-            // `.sync.part` resume offset), then drop the future outright,
-            // which aborts whatever request it was wedged in.
-            let mut download = std::pin::pin!(repo.download_with_progress_cancellable(
+        let hf_error = match self
+            .download_hf_from_endpoint(
+                &model_id,
+                &repo_id,
+                &revision,
                 &filename,
-                progress,
-                attempt_token.clone()
-            ));
-            let result = tokio::select! {
-                r = &mut download => r,
-                _ = attempt_token.cancelled() => {
-                    match tokio::time::timeout(Duration::from_secs(5), &mut download).await {
-                        Ok(r) => r,
-                        Err(_) => Err(hf_hub::api::tokio::ApiError::Cancelled),
-                    }
-                }
-            };
-            watchdog.abort();
-
-            match result {
-                Ok(_) => break None,
-                Err(hf_hub::api::tokio::ApiError::Cancelled) if cancel_token.is_cancelled() => {
-                    // User cancelled. hf-hub leaves the partially downloaded
-                    // `.sync.part` in the shared cache, so a later attempt resumes
-                    // instead of restarting. The guard resets is_downloading and
-                    // drops the token; `cancel_download` already emitted
-                    // `model-download-cancelled`.
-                    info!("HF download cancelled for: {}", model_id);
-                    return Ok(());
-                }
-                Err(hf_hub::api::tokio::ApiError::Cancelled) => {
-                    let err = anyhow::anyhow!(
-                        "transfer stalled: no progress for {}s",
-                        DOWNLOAD_STALL_TIMEOUT.as_secs()
-                    );
-                    // A parallel attempt may be what wedged the network. Give
-                    // the connection pool a brief pause, then retry once using
-                    // the known-compatible single-stream path. A sequential
-                    // stall already cost DOWNLOAD_STALL_TIMEOUT, so further
-                    // retries would likely just repeat it — use the mirror.
-                    if stream_count == 1 || attempt >= ATTEMPT_STREAMS.len() {
-                        break Some(err);
-                    }
-                    let delay = Duration::from_secs(1_u64 << attempt);
+                None,
+                &cancel_token,
+            )
+            .await?
+        {
+            HfAttemptOutcome::Completed => None,
+            HfAttemptOutcome::Cancelled => return Ok(()),
+            HfAttemptOutcome::Failed(primary_error) => {
+                // hf-mirror.com speaks the same resolve protocol, so the whole
+                // hf-hub path works against it unchanged. It mainly rescues
+                // networks where huggingface.co itself is unreachable; for
+                // Xet-backed repos the payload still comes from HF's CDN, so
+                // this is a cheap extra try, not a guaranteed fix. Skipped when
+                // the user pointed HF_ENDPOINT somewhere deliberately.
+                if std::env::var_os("HF_ENDPOINT").is_some() {
+                    Some(primary_error)
+                } else {
                     warn!(
-                        "HF download attempt {}/{} stalled for {} using {} concurrent stream(s); retrying with {} stream(s) in {}s",
-                        attempt,
-                        ATTEMPT_STREAMS.len(),
-                        model_id,
-                        stream_count,
-                        ATTEMPT_STREAMS[attempt],
-                        delay.as_secs()
+                        "Hugging Face download failed for {}; retrying via {}",
+                        model_id, HF_MIRROR_ENDPOINT
                     );
-                    tokio::select! {
-                        _ = tokio::time::sleep(delay) => {}
-                        _ = cancel_token.cancelled() => {
-                            info!("HF download cancelled for: {}", model_id);
-                            return Ok(());
-                        }
+                    match self
+                        .download_hf_from_endpoint(
+                            &model_id,
+                            &repo_id,
+                            &revision,
+                            &filename,
+                            Some(HF_MIRROR_ENDPOINT),
+                            &cancel_token,
+                        )
+                        .await?
+                    {
+                        HfAttemptOutcome::Completed => None,
+                        HfAttemptOutcome::Cancelled => return Ok(()),
+                        HfAttemptOutcome::Failed(mirror_error) => Some(anyhow::anyhow!(
+                            "{primary_error}; {HF_MIRROR_ENDPOINT}: {mirror_error}"
+                        )),
                     }
-                    attempt += 1;
-                }
-                Err(e) => {
-                    // {:?} keeps the error source chain (reset vs TLS vs timeout);
-                    // Display truncates it to "error sending request".
-                    let err = anyhow::anyhow!("{:?}", e);
-                    if attempt >= ATTEMPT_STREAMS.len() {
-                        break Some(err);
-                    }
-                    let delay = Duration::from_secs(1_u64 << attempt);
-                    warn!(
-                        "HF download attempt {}/{} failed for {} using {} concurrent stream(s): {}; retrying with {} stream(s) in {}s",
-                        attempt,
-                        ATTEMPT_STREAMS.len(),
-                        model_id,
-                        stream_count,
-                        err,
-                        ATTEMPT_STREAMS[attempt],
-                        delay.as_secs()
-                    );
-                    tokio::select! {
-                        _ = tokio::time::sleep(delay) => {}
-                        _ = cancel_token.cancelled() => {
-                            info!("HF download cancelled for: {}", model_id);
-                            return Ok(());
-                        }
-                    }
-                    attempt += 1;
                 }
             }
         };
 
         if let Some(hf_error) = hf_error {
-            // `attempt`, not the schedule length: a sequential stall breaks out early.
-            error!(
-                "HF download failed for {} after {} attempt(s): {:?}",
-                model_id, attempt, hf_error
-            );
+            error!("HF download failed for {}: {:?}", model_id, hf_error);
             let mirrors = crate::catalog::mirror_fallbacks(&model_id);
             if mirrors.is_empty() {
-                return Err(anyhow::anyhow!(
-                    "Hugging Face download failed after {} attempt(s): {}",
-                    attempt,
-                    hf_error
-                ));
+                return Err(anyhow::anyhow!("Hugging Face download failed: {hf_error}"));
             }
             let mut completed = false;
             for mirror in &mirrors {
@@ -2152,6 +2055,192 @@ impl ModelManager {
         let _ = self.app_handle.emit("model-download-complete", &model_id);
         info!("HF model {} downloaded", model_id);
         Ok(())
+    }
+
+    /// Run the full retry schedule for one Hugging Face endpoint. `endpoint`
+    /// of `None` uses hf-hub's own resolution (`HF_ENDPOINT`, else
+    /// huggingface.co). Errors are returned rather than propagated so the
+    /// caller can try another endpoint or a mirror.
+    #[allow(clippy::too_many_arguments)]
+    async fn download_hf_from_endpoint(
+        &self,
+        model_id: &str,
+        repo_id: &str,
+        revision: &str,
+        filename: &str,
+        endpoint: Option<&str>,
+        cancel_token: &CancellationToken,
+    ) -> Result<HfAttemptOutcome> {
+        // hf-hub has no working internal retry (its retry knobs are hardcoded
+        // to zero), so a single transient fault — dropped connection, a 429
+        // from the resolve endpoint, a CDN blip — would otherwise fail the
+        // whole download. Each attempt resumes from the `.sync.part`
+        // committed-offset marker, so a retry only re-fetches what the failed
+        // attempt hadn't finished.
+        // Start moderately parallel for normal-network throughput, then stay
+        // sequential after the first failure. Eight simultaneous connections
+        // were all reset on an affected network in #1579, while one stream
+        // succeeded; four is a less aggressive fast path, and every retry uses
+        // the known-compatible request pattern.
+        const ATTEMPT_STREAMS: [usize; 4] = [4, 1, 1, 1];
+        let mut attempt: usize = 1;
+        let hf_error = loop {
+            let stream_count = ATTEMPT_STREAMS[attempt - 1];
+            info!(
+                "HF download attempt {}/{} for {} using {} concurrent stream(s){}",
+                attempt,
+                ATTEMPT_STREAMS.len(),
+                model_id,
+                stream_count,
+                endpoint.map(|e| format!(" via {e}")).unwrap_or_default()
+            );
+
+            // Fresh client per attempt so a wedged connection from the previous
+            // try can't poison the retry.
+            let mut builder = ApiBuilder::from_env()
+                // Ignore cached and environment-provided credentials. A stale token
+                // can make otherwise-public downloads fail authentication.
+                .with_token(None)
+                .with_progress(false)
+                .with_max_files(stream_count);
+            if let Some(endpoint) = endpoint {
+                builder = builder.with_endpoint(endpoint.to_string());
+            }
+            let api = builder
+                .build()
+                .map_err(|e| anyhow::anyhow!("Failed to init Hugging Face API: {}", e))?;
+            let repo = api.repo(Repo::with_revision(
+                repo_id.to_string(),
+                RepoType::Model,
+                revision.to_string(),
+            ));
+            let progress = HfDownloadProgress::new(self.app_handle.clone(), model_id.to_string());
+
+            // hf-hub has no internal timeouts, so a wedged connection would
+            // otherwise hang this attempt forever and neither the retry loop
+            // nor the mirror fallback would ever fire. The watchdog cancels a
+            // per-attempt child token when progress goes stale; a user cancel
+            // on the parent propagates through the same child.
+            let attempt_token = cancel_token.child_token();
+            let watchdog = tokio::spawn({
+                let probe = progress.clone();
+                let attempt_token = attempt_token.clone();
+                async move {
+                    loop {
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                        if attempt_token.is_cancelled() {
+                            break;
+                        }
+                        if probe.last_activity().elapsed() > DOWNLOAD_STALL_TIMEOUT {
+                            attempt_token.cancel();
+                            break;
+                        }
+                    }
+                }
+            });
+            // hf-hub only observes its token inside the chunk loop — the
+            // metadata/resolve request and cache lock run before it, so a hang
+            // there would ignore the cancel entirely. Race the whole future
+            // against the token: on cancel, grant a short grace so an attempt
+            // that IS in the chunk loop can unwind gracefully (committing the
+            // `.sync.part` resume offset), then drop the future outright,
+            // which aborts whatever request it was wedged in.
+            let mut download = std::pin::pin!(repo.download_with_progress_cancellable(
+                filename,
+                progress,
+                attempt_token.clone()
+            ));
+            let result = tokio::select! {
+                r = &mut download => r,
+                _ = attempt_token.cancelled() => {
+                    match tokio::time::timeout(Duration::from_secs(5), &mut download).await {
+                        Ok(r) => r,
+                        Err(_) => Err(hf_hub::api::tokio::ApiError::Cancelled),
+                    }
+                }
+            };
+            watchdog.abort();
+
+            match result {
+                Ok(_) => break None,
+                Err(hf_hub::api::tokio::ApiError::Cancelled) if cancel_token.is_cancelled() => {
+                    // User cancelled. hf-hub leaves the partially downloaded
+                    // `.sync.part` in the shared cache, so a later attempt resumes
+                    // instead of restarting. The guard resets is_downloading and
+                    // drops the token; `cancel_download` already emitted
+                    // `model-download-cancelled`.
+                    info!("HF download cancelled for: {}", model_id);
+                    return Ok(HfAttemptOutcome::Cancelled);
+                }
+                Err(hf_hub::api::tokio::ApiError::Cancelled) => {
+                    let err = anyhow::anyhow!(
+                        "transfer stalled: no progress for {}s",
+                        DOWNLOAD_STALL_TIMEOUT.as_secs()
+                    );
+                    // A parallel attempt may be what wedged the network. Give
+                    // the connection pool a brief pause, then retry once using
+                    // the known-compatible single-stream path. A sequential
+                    // stall already cost DOWNLOAD_STALL_TIMEOUT, so further
+                    // retries would likely just repeat it — use the mirror.
+                    if stream_count == 1 || attempt >= ATTEMPT_STREAMS.len() {
+                        break Some(err);
+                    }
+                    let delay = Duration::from_secs(1_u64 << attempt);
+                    warn!(
+                        "HF download attempt {}/{} stalled for {} using {} concurrent stream(s); retrying with {} stream(s) in {}s",
+                        attempt,
+                        ATTEMPT_STREAMS.len(),
+                        model_id,
+                        stream_count,
+                        ATTEMPT_STREAMS[attempt],
+                        delay.as_secs()
+                    );
+                    tokio::select! {
+                        _ = tokio::time::sleep(delay) => {}
+                        _ = cancel_token.cancelled() => {
+                            info!("HF download cancelled for: {}", model_id);
+                            return Ok(HfAttemptOutcome::Cancelled);
+                        }
+                    }
+                    attempt += 1;
+                }
+                Err(e) => {
+                    // {:?} keeps the error source chain (reset vs TLS vs timeout);
+                    // Display truncates it to "error sending request".
+                    let err = anyhow::anyhow!("{:?}", e);
+                    if attempt >= ATTEMPT_STREAMS.len() {
+                        break Some(err);
+                    }
+                    let delay = Duration::from_secs(1_u64 << attempt);
+                    warn!(
+                        "HF download attempt {}/{} failed for {} using {} concurrent stream(s): {}; retrying with {} stream(s) in {}s",
+                        attempt,
+                        ATTEMPT_STREAMS.len(),
+                        model_id,
+                        stream_count,
+                        err,
+                        ATTEMPT_STREAMS[attempt],
+                        delay.as_secs()
+                    );
+                    tokio::select! {
+                        _ = tokio::time::sleep(delay) => {}
+                        _ = cancel_token.cancelled() => {
+                            info!("HF download cancelled for: {}", model_id);
+                            return Ok(HfAttemptOutcome::Cancelled);
+                        }
+                    }
+                    attempt += 1;
+                }
+            }
+        };
+
+        Ok(match hf_error {
+            None => HfAttemptOutcome::Completed,
+            // `attempt`, not the schedule length: a sequential stall breaks out early.
+            Some(err) => {
+                HfAttemptOutcome::Failed(anyhow::anyhow!("after {attempt} attempt(s): {err}"))
+            }
+        })
     }
 
     /// Direct-HTTP download of a catalog model's file from a mirror into the
