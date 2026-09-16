@@ -21,17 +21,30 @@
 //! from a single thread. Commands (register/unregister) are sent via an mpsc
 //! channel and responses are synchronously awaited.
 //!
+//! ## Modifier-only shortcuts on macOS
+//!
+//! `HotkeyManager::new_with_blocking` deletes every matching event so it never
+//! reaches other applications. That is required for shortcuts with a regular
+//! key (Option+Space would otherwise type a space), but for modifier-only
+//! shortcuts such as Fn it swallows the modifier press itself: every other app
+//! then sees Fn released without ever seeing it pressed, and stops working
+//! with Fn. On macOS modifier-only shortcuts are therefore matched by
+//! [`ModifierOnlyMatcher`] against a listen-only [`KeyboardListener`], which
+//! passes every event through untouched. The matcher also reports a regular
+//! key pressed while such a shortcut is held (Fn + F), so the dictation that
+//! the Fn press started can be discarded.
+//!
 //! ## Recording Mode
 //!
 //! For UI key capture, a separate `KeyboardListener` is created on-demand and
 //! polled from a dedicated recording thread. Events are emitted to the frontend
 //! via Tauri's event system.
 
-use handy_keys::{Hotkey, HotkeyId, HotkeyManager, HotkeyState, KeyboardListener};
+use handy_keys::{Hotkey, HotkeyId, HotkeyManager, HotkeyState, Key, KeyEvent, KeyboardListener};
 use log::{debug, error, info};
 use serde::Serialize;
 use specta::Type;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -40,7 +53,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::settings::{self, get_settings, ShortcutBinding};
 
-use super::handler::handle_shortcut_event;
+use super::handler::{handle_key_combination, handle_shortcut_event};
 
 /// Commands that can be sent to the hotkey manager thread
 enum ManagerCommand {
@@ -54,6 +67,126 @@ enum ManagerCommand {
         response: Sender<Result<(), String>>,
     },
     Shutdown,
+}
+
+/// Output of [`ModifierOnlyMatcher::process`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum MatcherSignal {
+    /// A modifier-only shortcut was pressed or released.
+    Shortcut {
+        binding_id: String,
+        hotkey_string: String,
+        is_pressed: bool,
+    },
+    /// A regular key went down while a modifier-only shortcut was held.
+    KeyCombination,
+}
+
+/// Matches modifier-only shortcuts (e.g. `fn`, `fn+shift_left`) against raw
+/// key events from a listen-only listener, with the same press/release rules
+/// as `handy_keys::HotkeyManager`.
+#[derive(Default)]
+struct ModifierOnlyMatcher {
+    /// binding_id -> (hotkey, hotkey string)
+    hotkeys: HashMap<String, (Hotkey, String)>,
+    /// Bindings whose shortcut is currently held.
+    pressed: HashSet<String>,
+}
+
+impl ModifierOnlyMatcher {
+    fn register(
+        &mut self,
+        binding_id: &str,
+        hotkey: Hotkey,
+        hotkey_string: &str,
+    ) -> Result<(), String> {
+        if self
+            .hotkeys
+            .values()
+            .any(|(existing, _)| *existing == hotkey)
+        {
+            return Err(format!(
+                "Failed to register hotkey: already registered: {}",
+                hotkey_string
+            ));
+        }
+        self.pressed.remove(binding_id);
+        self.hotkeys
+            .insert(binding_id.to_string(), (hotkey, hotkey_string.to_string()));
+        Ok(())
+    }
+
+    /// Returns whether the binding was registered here.
+    fn unregister(&mut self, binding_id: &str) -> bool {
+        self.pressed.remove(binding_id);
+        self.hotkeys.remove(binding_id).is_some()
+    }
+
+    fn process(&mut self, event: &KeyEvent) -> Vec<MatcherSignal> {
+        let mut signals = Vec::new();
+
+        if event.is_key_down {
+            if let Some(key) = event.key {
+                // Mouse buttons are reported with modifiers held; clicking while
+                // dictating is not a key combination.
+                if !self.pressed.is_empty() && !is_mouse_key(key) {
+                    signals.push(MatcherSignal::KeyCombination);
+                }
+                return signals;
+            }
+            for (binding_id, (hotkey, hotkey_string)) in &self.hotkeys {
+                if hotkey.modifiers.matches(event.modifiers) && !self.pressed.contains(binding_id) {
+                    self.pressed.insert(binding_id.clone());
+                    signals.push(MatcherSignal::Shortcut {
+                        binding_id: binding_id.clone(),
+                        hotkey_string: hotkey_string.clone(),
+                        is_pressed: true,
+                    });
+                }
+            }
+        } else if event.key.is_none() {
+            // A modifier went up: release every held shortcut whose modifiers
+            // no longer match.
+            for (binding_id, (hotkey, hotkey_string)) in &self.hotkeys {
+                if self.pressed.contains(binding_id) && !hotkey.modifiers.matches(event.modifiers) {
+                    self.pressed.remove(binding_id);
+                    signals.push(MatcherSignal::Shortcut {
+                        binding_id: binding_id.clone(),
+                        hotkey_string: hotkey_string.clone(),
+                        is_pressed: false,
+                    });
+                }
+            }
+        }
+
+        signals
+    }
+}
+
+fn is_mouse_key(key: Key) -> bool {
+    matches!(
+        key,
+        Key::MouseLeft | Key::MouseRight | Key::MouseMiddle | Key::MouseX1 | Key::MouseX2
+    )
+}
+
+/// A listen-only keyboard listener for modifier-only shortcuts, on macOS only.
+/// Elsewhere (and if it cannot be created) every shortcut uses the blocking
+/// manager as before.
+fn create_passthrough_listener() -> Option<KeyboardListener> {
+    if !cfg!(target_os = "macos") {
+        return None;
+    }
+    match KeyboardListener::new() {
+        Ok(listener) => Some(listener),
+        Err(e) => {
+            error!(
+                "Failed to create listen-only keyboard listener; modifier-only shortcuts will block: {}",
+                e
+            );
+            None
+        }
+    }
 }
 
 /// State for the handy-keys shortcut manager
@@ -123,7 +256,37 @@ impl HandyKeysState {
         let mut binding_to_hotkey: HashMap<String, HotkeyId> = HashMap::new();
         let mut hotkey_to_binding: HashMap<HotkeyId, (String, String)> = HashMap::new(); // (binding_id, hotkey_string)
 
+        let passthrough_listener = create_passthrough_listener();
+        let mut matcher = ModifierOnlyMatcher::default();
+
         loop {
+            // Modifier-only shortcuts, observed without blocking any event
+            if let Some(listener) = &passthrough_listener {
+                while let Some(key_event) = listener.try_recv() {
+                    for signal in matcher.process(&key_event) {
+                        match signal {
+                            MatcherSignal::Shortcut {
+                                binding_id,
+                                hotkey_string,
+                                is_pressed,
+                            } => {
+                                debug!(
+                                    "handy-keys passthrough event: binding={}, hotkey={}, pressed={}",
+                                    binding_id, hotkey_string, is_pressed
+                                );
+                                handle_shortcut_event(
+                                    &app,
+                                    &binding_id,
+                                    &hotkey_string,
+                                    is_pressed,
+                                );
+                            }
+                            MatcherSignal::KeyCombination => handle_key_combination(&app),
+                        }
+                    }
+                }
+            }
+
             // Check for hotkey events (non-blocking)
             while let Some(event) = manager.try_recv() {
                 if let Some((binding_id, hotkey_string)) = hotkey_to_binding.get(&event.id) {
@@ -146,6 +309,7 @@ impl HandyKeysState {
                     } => {
                         let result = Self::do_register(
                             &manager,
+                            passthrough_listener.is_some().then_some(&mut matcher),
                             &mut binding_to_hotkey,
                             &mut hotkey_to_binding,
                             &binding_id,
@@ -159,6 +323,7 @@ impl HandyKeysState {
                     } => {
                         let result = Self::do_unregister(
                             &manager,
+                            &mut matcher,
                             &mut binding_to_hotkey,
                             &mut hotkey_to_binding,
                             &binding_id,
@@ -186,6 +351,7 @@ impl HandyKeysState {
     /// Register a hotkey
     fn do_register(
         manager: &HotkeyManager,
+        passthrough: Option<&mut ModifierOnlyMatcher>,
         binding_to_hotkey: &mut HashMap<String, HotkeyId>,
         hotkey_to_binding: &mut HashMap<HotkeyId, (String, String)>,
         binding_id: &str,
@@ -194,6 +360,17 @@ impl HandyKeysState {
         let hotkey: Hotkey = hotkey_string
             .parse()
             .map_err(|e| format!("Failed to parse hotkey '{}': {}", hotkey_string, e))?;
+
+        if hotkey.key.is_none() {
+            if let Some(matcher) = passthrough {
+                matcher.register(binding_id, hotkey, hotkey_string)?;
+                debug!(
+                    "Registered listen-only handy-keys shortcut: {} -> {:?}",
+                    binding_id, hotkey
+                );
+                return Ok(());
+            }
+        }
 
         let id = manager
             .register(hotkey)
@@ -212,10 +389,18 @@ impl HandyKeysState {
     /// Unregister a hotkey
     fn do_unregister(
         manager: &HotkeyManager,
+        matcher: &mut ModifierOnlyMatcher,
         binding_to_hotkey: &mut HashMap<String, HotkeyId>,
         hotkey_to_binding: &mut HashMap<HotkeyId, (String, String)>,
         binding_id: &str,
     ) -> Result<(), String> {
+        if matcher.unregister(binding_id) {
+            debug!(
+                "Unregistered listen-only handy-keys shortcut: {}",
+                binding_id
+            );
+            return Ok(());
+        }
         if let Some(id) = binding_to_hotkey.remove(binding_id) {
             manager
                 .unregister(id)
@@ -575,4 +760,134 @@ pub fn stop_handy_keys_recording(app: AppHandle) -> Result<(), String> {
     let result = state.stop_recording();
     super::resume_all_shortcuts(&app);
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use handy_keys::Modifiers;
+
+    fn modifier_event(modifiers: Modifiers, is_key_down: bool) -> KeyEvent {
+        KeyEvent {
+            modifiers,
+            key: None,
+            is_key_down,
+            changed_modifier: None,
+        }
+    }
+
+    fn key_event(modifiers: Modifiers, key: Key, is_key_down: bool) -> KeyEvent {
+        KeyEvent {
+            modifiers,
+            key: Some(key),
+            is_key_down,
+            changed_modifier: None,
+        }
+    }
+
+    fn matcher_with(bindings: &[(&str, &str)]) -> ModifierOnlyMatcher {
+        let mut matcher = ModifierOnlyMatcher::default();
+        for (binding_id, hotkey_string) in bindings {
+            let hotkey: Hotkey = hotkey_string.parse().unwrap();
+            matcher.register(binding_id, hotkey, hotkey_string).unwrap();
+        }
+        matcher
+    }
+
+    fn shortcut(binding_id: &str, is_pressed: bool) -> MatcherSignal {
+        MatcherSignal::Shortcut {
+            binding_id: binding_id.to_string(),
+            hotkey_string: if binding_id == "transcribe" {
+                "fn".to_string()
+            } else {
+                "fn+shift_left".to_string()
+            },
+            is_pressed,
+        }
+    }
+
+    #[test]
+    fn fn_press_and_release_fire_the_shortcut() {
+        let mut matcher = matcher_with(&[("transcribe", "fn")]);
+        assert_eq!(
+            matcher.process(&modifier_event(Modifiers::FN, true)),
+            vec![shortcut("transcribe", true)]
+        );
+        assert_eq!(
+            matcher.process(&modifier_event(Modifiers::empty(), false)),
+            vec![shortcut("transcribe", false)]
+        );
+    }
+
+    #[test]
+    fn regular_key_while_fn_held_is_a_key_combination() {
+        let mut matcher = matcher_with(&[("transcribe", "fn")]);
+        matcher.process(&modifier_event(Modifiers::FN, true));
+        assert_eq!(
+            matcher.process(&key_event(Modifiers::FN, Key::F, true)),
+            vec![MatcherSignal::KeyCombination]
+        );
+        // The key-up of the combination is not reported again.
+        assert!(matcher
+            .process(&key_event(Modifiers::FN, Key::F, false))
+            .is_empty());
+    }
+
+    #[test]
+    fn keys_without_a_held_shortcut_are_ignored() {
+        let mut matcher = matcher_with(&[("transcribe", "fn")]);
+        assert!(matcher
+            .process(&key_event(Modifiers::empty(), Key::F, true))
+            .is_empty());
+        matcher.process(&modifier_event(Modifiers::FN, true));
+        matcher.process(&modifier_event(Modifiers::empty(), false));
+        assert!(matcher
+            .process(&key_event(Modifiers::empty(), Key::F, true))
+            .is_empty());
+    }
+
+    #[test]
+    fn mouse_click_while_fn_held_is_not_a_key_combination() {
+        let mut matcher = matcher_with(&[("transcribe", "fn")]);
+        matcher.process(&modifier_event(Modifiers::FN, true));
+        assert!(matcher
+            .process(&key_event(Modifiers::FN, Key::MouseLeft, true))
+            .is_empty());
+    }
+
+    #[test]
+    fn fn_then_left_shift_presses_translate_and_keeps_dictate_held() {
+        let mut matcher = matcher_with(&[("transcribe", "fn"), ("translate", "fn+shift_left")]);
+        assert_eq!(
+            matcher.process(&modifier_event(Modifiers::FN, true)),
+            vec![shortcut("transcribe", true)]
+        );
+        assert_eq!(
+            matcher.process(&modifier_event(Modifiers::FN | Modifiers::SHIFT_LEFT, true)),
+            vec![shortcut("translate", true)]
+        );
+        // Shift up releases translate only; Fn is still held.
+        assert_eq!(
+            matcher.process(&modifier_event(Modifiers::FN, false)),
+            vec![shortcut("translate", false)]
+        );
+        assert_eq!(
+            matcher.process(&modifier_event(Modifiers::empty(), false)),
+            vec![shortcut("transcribe", false)]
+        );
+    }
+
+    #[test]
+    fn duplicate_hotkey_is_rejected_and_unregister_clears_held_state() {
+        let mut matcher = matcher_with(&[("transcribe", "fn")]);
+        let hotkey: Hotkey = "fn".parse().unwrap();
+        assert!(matcher.register("transcribe", hotkey, "fn").is_err());
+
+        matcher.process(&modifier_event(Modifiers::FN, true));
+        assert!(matcher.unregister("transcribe"));
+        assert!(!matcher.unregister("transcribe"));
+        assert!(matcher
+            .process(&key_event(Modifiers::FN, Key::F, true))
+            .is_empty());
+    }
 }

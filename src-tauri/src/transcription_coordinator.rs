@@ -176,6 +176,8 @@ enum Effect {
     },
     /// The recording continues under a different mode (dictate → translate).
     SwitchMode { mode: SessionMode },
+    /// Discard the active recording without transcribing it.
+    Cancel,
 }
 
 /// Commands processed sequentially by the coordinator thread.
@@ -187,6 +189,9 @@ enum Command {
     ProcessingFinished,
     /// Stop and commit the active recording (overlay confirm button).
     StopActive,
+    /// A regular key went down while a modifier-only session shortcut (Fn)
+    /// was still held: the user is typing a key combination, not dictating.
+    Chord,
 }
 
 /// Decide whether a key-up should be deferred (so auto-repeat can cancel it)
@@ -542,6 +547,36 @@ impl CoordinatorState {
         Some(effect)
     }
 
+    /// A regular key was pressed while a modifier-only session shortcut was
+    /// physically held (e.g. Fn + F). The press was the start of a key
+    /// combination, so the recording it started is discarded, not
+    /// transcribed.
+    ///
+    /// While recording, a held session shortcut is always the press that
+    /// started (or upgraded) this recording: any later press of a locked
+    /// session stops it and moves the pipeline to `Processing`. A chord during
+    /// processing never aborts the transcription already under way; it only
+    /// drops a press remembered for the drain, which is the held key itself.
+    fn on_chord(&mut self) -> Option<Effect> {
+        match self.stage {
+            Stage::Recording(_) => {
+                debug!("Key combination while the session shortcut is held: discarding recording");
+                self.stage = Stage::Idle;
+                self.hold = None;
+                self.pending_release = None;
+                self.pending_press = None;
+                Some(Effect::Cancel)
+            }
+            Stage::Processing => {
+                if self.pending_press.take().is_some() {
+                    debug!("Key combination while busy: forgetting remembered press");
+                }
+                None
+            }
+            Stage::Idle => None,
+        }
+    }
+
     fn on_cancel(&mut self, recording_was_active: bool) {
         self.pending_release = None;
         // An explicit cancel abandons any remembered start too — the user
@@ -675,6 +710,11 @@ impl TranscriptionCoordinator {
                                 run_effect(&app, &mut state, effect);
                             }
                         }
+                        Command::Chord => {
+                            if let Some(effect) = state.on_chord() {
+                                run_effect(&app, &mut state, effect);
+                            }
+                        }
                     }
                 }
                 debug!("Transcription coordinator exited");
@@ -757,6 +797,13 @@ impl TranscriptionCoordinator {
         }
     }
 
+    /// A regular key went down while a modifier-only session shortcut was held.
+    pub fn notify_chord(&self) {
+        if self.tx.send(Command::Chord).is_err() {
+            warn!("Transcription coordinator channel closed");
+        }
+    }
+
     /// Stop and commit the active recording, if any (overlay confirm button).
     pub fn stop_active(&self) {
         if self.tx.send(Command::StopActive).is_err() {
@@ -785,6 +832,7 @@ fn run_effect(app: &AppHandle, state: &mut CoordinatorState, effect: Effect) {
             hotkey_string,
         } => stop(app, &binding_id, &hotkey_string),
         Effect::SwitchMode { mode } => crate::actions::switch_session_mode(app, mode),
+        Effect::Cancel => crate::utils::cancel_current_operation(app),
     }
 }
 
@@ -1024,7 +1072,7 @@ mod tests {
             match effect {
                 Some(Effect::Start { .. }) => starts += 1,
                 Some(Effect::Stop { .. }) => stops += 1,
-                Some(Effect::SwitchMode { .. }) | None => {}
+                Some(Effect::SwitchMode { .. } | Effect::Cancel) | None => {}
             }
         }
 
@@ -1869,5 +1917,70 @@ mod tests {
             .is_none());
         // A confirm click must not suppress the next shortcut press.
         assert!(state.last_stop.is_none());
+    }
+
+    // ---------------------------------------------------------------------
+    // Key combinations (Fn + another key) discard the recording they started.
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn chord_while_holding_discards_recording() {
+        let mut state = CoordinatorState::new();
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+
+        assert!(matches!(
+            state.on_input(chord(DICTATE, true), t0),
+            Some(Effect::Start { .. })
+        ));
+        assert_eq!(state.on_chord(), Some(Effect::Cancel));
+        assert_eq!(state.stage, Stage::Idle);
+
+        // Releasing Fn afterwards neither stops nor restarts anything.
+        assert!(state.on_input(chord(DICTATE, false), at(120)).is_none());
+        assert!(state.on_grace_expired().is_none());
+        assert_eq!(state.stage, Stage::Idle);
+    }
+
+    #[test]
+    fn chord_in_toggle_mode_discards_recording_started_by_held_press() {
+        let mode = ShortcutActivation::Toggle;
+        let mut state = CoordinatorState::new();
+        let t0 = Instant::now();
+
+        assert!(matches!(
+            state.on_input(input(mode, true), t0),
+            Some(Effect::Start { .. })
+        ));
+        assert_eq!(state.on_chord(), Some(Effect::Cancel));
+        assert_eq!(state.stage, Stage::Idle);
+    }
+
+    #[test]
+    fn chord_during_processing_keeps_transcription_and_forgets_remembered_press() {
+        let mode = ShortcutActivation::HoldOrToggle;
+        let mut state = CoordinatorState::new();
+        let t0 = Instant::now();
+        hold_or_toggle_into_processing(&mut state, t0);
+
+        assert!(state
+            .on_input(input(mode, true), t0 + Duration::from_millis(2000))
+            .is_none());
+        assert!(state.pending_press.is_some());
+
+        assert!(
+            state.on_chord().is_none(),
+            "processing must never be aborted"
+        );
+        assert_eq!(state.stage, Stage::Processing);
+        assert!(state.on_processing_finished().is_none());
+        assert_eq!(state.stage, Stage::Idle);
+    }
+
+    #[test]
+    fn chord_while_idle_is_noop() {
+        let mut state = CoordinatorState::new();
+        assert!(state.on_chord().is_none());
+        assert_eq!(state.stage, Stage::Idle);
     }
 }

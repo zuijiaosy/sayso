@@ -74,3 +74,15 @@ pub fn handle_shortcut_event(
         action.stop(app, binding_id, hotkey_string);
     }
 }
+
+/// A regular key went down while a modifier-only shortcut (e.g. Fn) was held.
+///
+/// The user is typing a key combination such as Fn + F rather than dictating,
+/// so the coordinator discards the recording that the modifier press started.
+pub fn handle_key_combination(app: &AppHandle) {
+    if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
+        coordinator.notify_chord();
+    } else {
+        warn!("TranscriptionCoordinator is not initialized");
+    }
+}
