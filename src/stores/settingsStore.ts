@@ -13,6 +13,7 @@ import type {
   TranscribeAcceleratorSetting,
   OrtAcceleratorSetting,
   ShortcutActivation,
+  StepFunAsrSettings,
   VadBackend,
 } from "@/bindings";
 import { commands } from "@/bindings";
@@ -222,6 +223,15 @@ const settingUpdaters: {
     commands.updateCloudAsrProvider(value as CloudAsrProvider),
   glm_asr: async (value) => {
     const result = await commands.updateGlmAsrSettings(value as GlmAsrSettings);
+    if (result.status === "error") {
+      toast.error(result.error);
+      throw new Error(result.error);
+    }
+  },
+  stepfun_asr: async (value) => {
+    const result = await commands.updateStepfunAsrSettings(
+      value as StepFunAsrSettings,
+    );
     if (result.status === "error") {
       toast.error(result.error);
       throw new Error(result.error);

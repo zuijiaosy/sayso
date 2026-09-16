@@ -11,8 +11,8 @@ import {
 import { Shield } from "lucide-react";
 import { commands } from "@/bindings";
 import { Button } from "@/components/ui/Button";
-import { Page, Row, Section, StatusPill } from "../ui";
-import { useFnKeyUsage } from "./ShortcutsPage";
+import { Row, Section, StatusPill } from "../ui";
+import { useFnKeyUsage } from "./HomePage";
 
 export interface PermissionState {
   microphone: boolean | null;
@@ -126,19 +126,19 @@ export const PermissionRows: React.FC<{ state: PermissionState }> = ({
   );
 };
 
-export const PermissionsPage: React.FC = () => {
+/** The permissions block, shown inside the Settings page. */
+export const PermissionsSection: React.FC = () => {
   const { t } = useTranslation();
   const { state } = usePermissions();
   const { usage, refresh } = useFnKeyUsage();
 
   return (
-    <Page
-      title={t("voiceless.permissions.title")}
-      description={t("voiceless.permissions.description")}
-    >
+    // One flex child of the page, so the hint stays close to its section.
+    <div className="flex flex-col gap-3">
       <Section
         icon={<Shield size={20} />}
         title={t("voiceless.permissions.title")}
+        description={t("voiceless.permissions.description")}
       >
         <PermissionRows state={state} />
         <Row
@@ -176,6 +176,6 @@ export const PermissionsPage: React.FC = () => {
       <p className="text-[13px] text-mid-gray leading-relaxed">
         {t("voiceless.permissions.restartHint")}
       </p>
-    </Page>
+    </div>
   );
 };

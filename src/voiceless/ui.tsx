@@ -12,32 +12,41 @@ export const Page: React.FC<{
         {description}
       </p>
     )}
-    <div className="mt-6 flex flex-col gap-8">{children}</div>
+    <div className="mt-7 flex flex-col gap-10">{children}</div>
   </div>
 );
 
+/**
+ * A titled group of rows. Sizes deliberately sit between the page title (28px)
+ * and a row title (14px) so the three levels stay distinguishable. Omitting
+ * `title` drops the header entirely, for a page with a single unlabelled list.
+ */
 export const Section: React.FC<{
   icon?: React.ReactNode;
-  title: string;
+  title?: string;
   description?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ icon, title, description, actions, children }) => (
   <section>
-    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pb-3 border-b border-mid-gray/20">
-      {icon && <span className="text-mid-gray shrink-0">{icon}</span>}
-      <div className="flex-1 min-w-0">
-        <h2 className="text-base font-semibold text-text/80">{title}</h2>
-        {description && (
-          <p className="text-xs text-mid-gray mt-0.5 leading-relaxed">
-            {description}
-          </p>
+    {title && (
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pb-3 border-b border-mid-gray/20">
+        {icon && <span className="text-background-ui shrink-0">{icon}</span>}
+        <div className="flex-1 min-w-0">
+          <h2 className="text-[17px] leading-6 font-bold tracking-tight">
+            {title}
+          </h2>
+          {description && (
+            <p className="text-xs text-mid-gray mt-0.5 leading-relaxed">
+              {description}
+            </p>
+          )}
+        </div>
+        {actions && (
+          <div className="shrink-0 flex items-center gap-2">{actions}</div>
         )}
       </div>
-      {actions && (
-        <div className="shrink-0 flex items-center gap-2">{actions}</div>
-      )}
-    </div>
+    )}
     <div className="divide-y divide-mid-gray/15">{children}</div>
   </section>
 );
@@ -56,7 +65,7 @@ export const Row: React.FC<{
     }
   >
     <div className="min-w-0 flex-1">
-      <div className="text-[15px] font-semibold">{title}</div>
+      <div className="text-[14px] font-medium">{title}</div>
       {description && (
         <div className="text-[13px] text-mid-gray mt-0.5 leading-relaxed">
           {description}

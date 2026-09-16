@@ -1,10 +1,15 @@
-//! Zhipu GLM-ASR (`glm-asr-2512`) on the BigModel open platform.
+//! StepFun (阶跃星辰) StepAudio ASR (`stepaudio-2.5-asr`).
 //!
-//! `POST {endpoint}/audio/transcriptions`, multipart form with `model`,
-//! `stream=false`, the WAV `file`, and optional `hotwords`. The service
-//! accepts at most 30 s of audio per request, so recordings are split near
-//! quiet points and the chunks are recognized in parallel.
-//! Docs: https://docs.bigmodel.cn/cn/guide/models/sound-and-video/glm-asr-2512
+//! `POST {endpoint}/audio/transcriptions`, an OpenAI-shaped multipart form with
+//! `model`, `response_format=json`, the WAV `file`, and optional `hotwords`
+//! (a JSON array string). The service accepts files up to 100 MB and audio up
+//! to 30 minutes; recordings are still split near quiet points so a single
+//! request stays inside the client timeout.
+//!
+//! Step Plan subscription keys cannot call this endpoint — they are limited to
+//! the SSE API under `https://api.stepfun.com/step_plan/v1`.
+//!
+//! Docs: https://platform.stepfun.com/docs/zh/api-reference/audio/transcriptions
 
 use super::{
     dedup_terms, encode_wav, join_segments, parse_transcription_response, split_for_upload,
@@ -13,11 +18,13 @@ use super::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-pub const PROVIDER_ID: &str = "glm";
-pub const DEFAULT_ENDPOINT: &str = "https://open.bigmodel.cn/api/paas/v4";
-pub const DEFAULT_MODEL: &str = "glm-asr-2512";
-/// Service limit is 30 s; stay below it so a cut never exceeds the limit.
-pub const MAX_CHUNK_SECS: f32 = 28.0;
+pub const PROVIDER_ID: &str = "stepfun";
+pub const DEFAULT_ENDPOINT: &str = "https://api.stepfun.com/v1";
+pub const DEFAULT_MODEL: &str = "stepaudio-2.5-asr";
+/// The file limit is 100 MB and the model takes up to 30 minutes, so the cut is
+/// about request latency: 180 s of 16 kHz / 16-bit mono WAV is ~5.8 MB.
+pub const MAX_CHUNK_SECS: f32 = 180.0;
+/// The docs do not state a limit; stay with the cap used for the other vendors.
 pub const MAX_HOTWORDS: usize = 100;
 
 /// Set when the service rejected hotwords once; later requests omit them
@@ -25,7 +32,7 @@ pub const MAX_HOTWORDS: usize = 100;
 static HOTWORDS_REJECTED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, Clone)]
-pub struct GlmAsrRequest {
+pub struct StepFunAsrRequest {
     pub endpoint: String,
     pub api_key: String,
     pub model: String,
@@ -37,28 +44,30 @@ pub fn hotwords_from_terms<'a>(terms: impl IntoIterator<Item = &'a str>) -> Vec<
     dedup_terms(terms, MAX_HOTWORDS)
 }
 
-/// Text form fields for one request. Hotwords use the same encoding as the
-/// official SDK (`hotwords[]`, one field per word).
-pub fn form_text_fields(req: &GlmAsrRequest, include_hotwords: bool) -> Vec<(String, String)> {
+/// Text form fields for one request. `response_format` is required by the API.
+/// Hotwords go in a single field holding a JSON array string.
+pub fn form_text_fields(req: &StepFunAsrRequest, include_hotwords: bool) -> Vec<(String, String)> {
     let mut fields = vec![
         ("model".to_string(), req.model.clone()),
-        ("stream".to_string(), "false".to_string()),
+        ("response_format".to_string(), "json".to_string()),
     ];
-    if include_hotwords {
-        for word in req.hotwords.iter().take(MAX_HOTWORDS) {
-            fields.push(("hotwords[]".to_string(), word.clone()));
+    if include_hotwords && !req.hotwords.is_empty() {
+        let words: Vec<&str> = req
+            .hotwords
+            .iter()
+            .take(MAX_HOTWORDS)
+            .map(String::as_str)
+            .collect();
+        if let Ok(json) = serde_json::to_string(&words) {
+            fields.push(("hotwords".to_string(), json));
         }
     }
     fields
 }
 
-pub fn parse_response(status: u16, body: &str) -> Result<String, AsrError> {
-    parse_transcription_response(status, body)
-}
-
 async fn send_chunk(
     client: &reqwest::Client,
-    req: &GlmAsrRequest,
+    req: &StepFunAsrRequest,
     wav: Vec<u8>,
     include_hotwords: bool,
 ) -> Result<String, AsrError> {
@@ -90,19 +99,19 @@ async fn send_chunk(
         .text()
         .await
         .map_err(|e| AsrError::Network(e.without_url().to_string()))?;
-    parse_response(status, &body)
+    parse_transcription_response(status, &body)
 }
 
 async fn transcribe_chunk(
     client: &reqwest::Client,
-    req: &GlmAsrRequest,
+    req: &StepFunAsrRequest,
     samples: &[f32],
 ) -> Result<String, AsrError> {
     let wav = encode_wav(samples)?;
     let with_hotwords = !req.hotwords.is_empty() && !HOTWORDS_REJECTED.load(Ordering::Relaxed);
     match send_chunk(client, req, wav.clone(), with_hotwords).await {
         Err(AsrError::Http { status: 400, .. }) if with_hotwords => {
-            log::warn!("GLM-ASR rejected the request with hotwords; retrying without them");
+            log::warn!("StepAudio ASR rejected the request with hotwords; retrying without them");
             HOTWORDS_REJECTED.store(true, Ordering::Relaxed);
             send_chunk(client, req, wav, false).await
         }
@@ -110,7 +119,7 @@ async fn transcribe_chunk(
     }
 }
 
-pub async fn transcribe(req: &GlmAsrRequest, samples: &[f32]) -> Result<String, AsrError> {
+pub async fn transcribe(req: &StepFunAsrRequest, samples: &[f32]) -> Result<String, AsrError> {
     if req.api_key.trim().is_empty() {
         return Err(AsrError::NotConfigured("missing API key".into()));
     }
@@ -119,12 +128,12 @@ pub async fn transcribe(req: &GlmAsrRequest, samples: &[f32]) -> Result<String, 
     }
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
-        .timeout(Duration::from_secs(60))
+        .timeout(Duration::from_secs(90))
         .user_agent("Voiceless/0.1")
         .build()
         .map_err(|e| AsrError::Network(e.to_string()))?;
 
-    let chunks = split_for_upload(samples, MAX_CHUNK_SECS, 6.0);
+    let chunks = split_for_upload(samples, MAX_CHUNK_SECS, 10.0);
     let results = futures_util::future::join_all(
         chunks
             .into_iter()
@@ -139,8 +148,8 @@ pub async fn transcribe(req: &GlmAsrRequest, samples: &[f32]) -> Result<String, 
 mod tests {
     use super::*;
 
-    fn request() -> GlmAsrRequest {
-        GlmAsrRequest {
+    fn request() -> StepFunAsrRequest {
+        StepFunAsrRequest {
             endpoint: DEFAULT_ENDPOINT.into(),
             api_key: "key".into(),
             model: DEFAULT_MODEL.into(),
@@ -150,22 +159,30 @@ mod tests {
 
     #[test]
     fn url_is_built_once() {
-        let url = transcriptions_url("https://open.bigmodel.cn/api/paas/v4/");
-        assert_eq!(
-            url,
-            "https://open.bigmodel.cn/api/paas/v4/audio/transcriptions"
-        );
+        let url = transcriptions_url("https://api.stepfun.com/v1/");
+        assert_eq!(url, "https://api.stepfun.com/v1/audio/transcriptions");
         assert_eq!(transcriptions_url(&url), url);
     }
 
     #[test]
-    fn form_fields_follow_sdk_encoding() {
+    fn form_always_carries_model_and_response_format() {
+        let fields = form_text_fields(&request(), false);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0], ("model".into(), "stepaudio-2.5-asr".into()));
+        assert_eq!(fields[1], ("response_format".into(), "json".into()));
+    }
+
+    #[test]
+    fn hotwords_are_one_json_array_field() {
         let fields = form_text_fields(&request(), true);
-        assert_eq!(fields[0], ("model".into(), "glm-asr-2512".into()));
-        assert_eq!(fields[1], ("stream".into(), "false".into()));
-        assert_eq!(fields[2], ("hotwords[]".into(), "Codex".into()));
-        assert_eq!(fields[3], ("hotwords[]".into(), "new-api".into()));
-        assert_eq!(form_text_fields(&request(), false).len(), 2);
+        assert_eq!(fields.len(), 3);
+        assert_eq!(
+            fields[2],
+            ("hotwords".into(), r#"["Codex","new-api"]"#.into())
+        );
+        let mut empty = request();
+        empty.hotwords.clear();
+        assert_eq!(form_text_fields(&empty, true).len(), 2);
     }
 
     #[test]
@@ -181,39 +198,29 @@ mod tests {
 
     #[test]
     fn parses_success_and_errors() {
-        let ok = r#"{"id":"x","created":1,"request_id":"r","model":"glm-asr-2512","text":" 你好，世界。 "}"#;
-        assert_eq!(parse_response(200, ok).unwrap(), "你好，世界。");
-        let err = r#"{"error":{"code":"1002","message":"Authorization Token非法"}}"#;
+        let ok = r#"{"text":" 你好，世界。 "}"#;
         assert_eq!(
-            parse_response(401, err),
-            Err(AsrError::Http {
-                status: 401,
-                code: Some("1002".into()),
-                message: "Authorization Token非法".into()
-            })
+            parse_transcription_response(200, ok).unwrap(),
+            "你好，世界。"
         );
         assert!(matches!(
-            parse_response(200, "{}"),
-            Err(AsrError::InvalidResponse(_))
-        ));
-        assert!(matches!(
-            parse_response(502, "bad gateway"),
-            Err(AsrError::Http { status: 502, .. })
+            parse_transcription_response(401, r#"{"error":{"message":"invalid api key"}}"#),
+            Err(AsrError::Http { status: 401, .. })
         ));
     }
 
     #[test]
-    fn long_audio_splits_under_the_30_second_limit() {
-        let samples = vec![0.1f32; 16_000 * 70];
-        let chunks = split_for_upload(&samples, MAX_CHUNK_SECS, 6.0);
+    fn long_audio_splits_under_the_request_budget() {
+        let samples = vec![0.1f32; 16_000 * 400];
+        let chunks = split_for_upload(&samples, MAX_CHUNK_SECS, 10.0);
         assert_eq!(chunks.len(), 3);
-        assert!(chunks.iter().all(|c| c.len() <= 16_000 * 30));
+        assert!(chunks.iter().all(|c| c.len() <= 16_000 * 185));
     }
 
-    /// `VOICELESS_LIVE_TESTS=1 cargo test --lib live_glm -- --ignored`
+    /// `VOICELESS_LIVE_TESTS=1 cargo test --lib live_stepfun -- --ignored`
     #[test]
     #[ignore]
-    fn live_glm_invalid_key_is_rejected() {
+    fn live_stepfun_invalid_key_is_rejected() {
         if std::env::var("VOICELESS_LIVE_TESTS").ok().as_deref() != Some("1") {
             return;
         }

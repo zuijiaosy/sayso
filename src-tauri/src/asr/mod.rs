@@ -5,6 +5,7 @@
 
 pub mod dashscope;
 pub mod glm;
+pub mod stepfun;
 
 use std::io::Cursor;
 
@@ -96,6 +97,24 @@ pub fn glm_request(settings: &crate::settings::AppSettings) -> glm::GlmAsrReques
     }
 }
 
+pub fn stepfun_request(settings: &crate::settings::AppSettings) -> stepfun::StepFunAsrRequest {
+    let cfg = &settings.stepfun_asr;
+    stepfun::StepFunAsrRequest {
+        endpoint: cfg.endpoint.clone(),
+        api_key: settings
+            .asr_api_keys
+            .get(stepfun::PROVIDER_ID)
+            .cloned()
+            .unwrap_or_default(),
+        model: cfg.model.clone(),
+        hotwords: if cfg.send_dictionary {
+            stepfun::hotwords_from_terms(settings.dictionary.iter().map(|e| e.term.as_str()))
+        } else {
+            Vec::new()
+        },
+    }
+}
+
 /// Recognize with the cloud vendor selected in settings.
 pub async fn transcribe_cloud(
     settings: &crate::settings::AppSettings,
@@ -108,7 +127,80 @@ pub async fn transcribe_cloud(
         crate::settings::CloudAsrProvider::Glm => {
             glm::transcribe(&glm_request(settings), samples).await
         }
+        crate::settings::CloudAsrProvider::Stepfun => {
+            stepfun::transcribe(&stepfun_request(settings), samples).await
+        }
     }
+}
+
+/// `{base}/audio/transcriptions`, added only when it is not already there.
+/// Shared by the vendors with an OpenAI-shaped transcription endpoint.
+pub fn transcriptions_url(endpoint: &str) -> String {
+    let base = endpoint.trim().trim_end_matches('/');
+    if base.ends_with("/audio/transcriptions") {
+        base.to_string()
+    } else {
+        format!("{base}/audio/transcriptions")
+    }
+}
+
+/// Read `{"text": ...}` from an OpenAI-shaped transcription response, or turn
+/// the body into an `AsrError`.
+pub fn parse_transcription_response(status: u16, body: &str) -> Result<String, AsrError> {
+    let value: serde_json::Value = match serde_json::from_str(body) {
+        Ok(v) => v,
+        Err(_) if (200..300).contains(&status) => {
+            return Err(AsrError::InvalidResponse("response is not JSON".into()))
+        }
+        Err(_) => {
+            return Err(AsrError::Http {
+                status,
+                code: None,
+                message: body.chars().take(200).collect(),
+            })
+        }
+    };
+    if !(200..300).contains(&status) || value.get("error").is_some() {
+        let error = value.get("error").unwrap_or(&value);
+        let code = error.get("code").and_then(|c| match c {
+            serde_json::Value::String(s) => Some(s.clone()),
+            serde_json::Value::Number(n) => Some(n.to_string()),
+            _ => None,
+        });
+        let message = error
+            .get("message")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("request failed")
+            .to_string();
+        return Err(AsrError::Http {
+            status,
+            code,
+            message,
+        });
+    }
+    value
+        .get("text")
+        .and_then(serde_json::Value::as_str)
+        .map(|t| t.trim().to_string())
+        .ok_or_else(|| AsrError::InvalidResponse("missing text".into()))
+}
+
+/// Trimmed, de-duplicated terms, at most `cap` of them. Shared by the vendors
+/// that take dictionary entries as a hotword list.
+pub fn dedup_terms<'a>(terms: impl IntoIterator<Item = &'a str>, cap: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    if cap == 0 {
+        return out;
+    }
+    for term in terms.into_iter().map(str::trim).filter(|t| !t.is_empty()) {
+        if !out.iter().any(|t| t == term) {
+            out.push(term.to_string());
+        }
+        if out.len() == cap {
+            break;
+        }
+    }
+    out
 }
 
 /// Encode 16 kHz mono float samples as a 16-bit PCM WAV file in memory.

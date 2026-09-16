@@ -3,9 +3,8 @@ import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
-import { Plus, RotateCcw, X } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { commands } from "@/bindings";
-import { Button } from "@/components/ui/Button";
 import { useSettings } from "@/hooks/useSettings";
 import { SECURE_INPUT_HELP_URL } from "@/components/SecureInputWarning";
 import { bindingChips } from "./keys";
@@ -155,62 +154,44 @@ const BindingBox: React.FC<{
   </div>
 );
 
-export const ShortcutField: React.FC<{
-  bindingId: string;
-  altBindingId: string;
-}> = ({ bindingId, altBindingId }) => {
+/** Each mode has exactly one shortcut; clicking the box records a new one. */
+export const ShortcutField: React.FC<{ bindingId: string }> = ({
+  bindingId,
+}) => {
   const { t } = useTranslation();
-  const { settings, resetBinding, refreshSettings } = useSettings();
+  const { settings, resetBinding } = useSettings();
   const { recordingId, preview, start, stop } = useShortcutRecorder();
-  const [showAltSlot, setShowAltSlot] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const primary = settings?.bindings?.[bindingId];
-  const alt = settings?.bindings?.[altBindingId];
-  const altSet = Boolean(alt?.current_binding);
+  const binding = settings?.bindings?.[bindingId];
+  const recording = recordingId === bindingId;
 
   // Click outside cancels recording (the stored binding is untouched).
   useEffect(() => {
     if (!recordingId) return;
     const onDown = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) {
-        void stop();
-        setShowAltSlot(false);
-      }
+      if (!containerRef.current?.contains(e.target as Node)) void stop();
     };
     window.addEventListener("mousedown", onDown);
     return () => window.removeEventListener("mousedown", onDown);
   }, [recordingId, stop]);
 
-  useEffect(() => {
-    if (altSet) setShowAltSlot(false);
-  }, [altSet]);
-
-  const chipsFor = (id: string, stored?: string) =>
-    recordingId === id ? bindingChips(preview) : bindingChips(stored);
-
-  const clearAlt = async () => {
-    const result = await commands.clearBinding(altBindingId);
-    if (result.status === "error") {
-      toast.error(
-        t("voiceless.shortcuts.errors.clear", { error: result.error }),
-      );
-    }
-    await refreshSettings();
-  };
-
-  const primaryIsDefault =
-    !primary || primary.current_binding === primary.default_binding;
+  const isDefault =
+    !binding || binding.current_binding === binding.default_binding;
 
   return (
     <div ref={containerRef} className="flex flex-col items-end gap-2">
       <BindingBox
-        chips={chipsFor(bindingId, primary?.current_binding)}
-        recording={recordingId === bindingId}
+        chips={
+          recording
+            ? bindingChips(preview)
+            : bindingChips(binding?.current_binding)
+        }
+        recording={recording}
         placeholder={t("voiceless.shortcuts.pressKeys")}
         onClick={() => void start(bindingId)}
         trailing={
-          !primaryIsDefault && recordingId !== bindingId ? (
+          !isDefault && !recording ? (
             <button
               type="button"
               title={t("voiceless.shortcuts.reset")}
@@ -223,42 +204,6 @@ export const ShortcutField: React.FC<{
           ) : null
         }
       />
-      {(altSet || showAltSlot || recordingId === altBindingId) && (
-        <BindingBox
-          chips={chipsFor(altBindingId, alt?.current_binding)}
-          recording={recordingId === altBindingId}
-          placeholder={t("voiceless.shortcuts.pressKeys")}
-          onClick={() => void start(altBindingId)}
-          trailing={
-            <button
-              type="button"
-              title={t("voiceless.shortcuts.remove")}
-              aria-label={t("voiceless.shortcuts.remove")}
-              className="shrink-0 p-1.5 rounded-md text-mid-gray hover:text-text hover:bg-mid-gray/15 cursor-pointer"
-              onClick={() => {
-                void stop();
-                setShowAltSlot(false);
-                if (altSet) void clearAlt();
-              }}
-            >
-              <X size={16} />
-            </button>
-          }
-        />
-      )}
-      {!altSet && !showAltSlot && recordingId !== altBindingId && (
-        <Button
-          variant="secondary"
-          size="md"
-          onClick={() => {
-            setShowAltSlot(true);
-            void start(altBindingId);
-          }}
-        >
-          <Plus size={15} />
-          {t("voiceless.shortcuts.addAnother")}
-        </Button>
-      )}
     </div>
   );
 };

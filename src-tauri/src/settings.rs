@@ -283,6 +283,8 @@ pub enum CloudAsrProvider {
     Dashscope,
     /// Zhipu BigModel GLM-ASR.
     Glm,
+    /// StepFun (阶跃星辰) StepAudio ASR.
+    Stepfun,
 }
 
 /// Settings for Zhipu GLM-ASR. The API key is stored in `asr_api_keys["glm"]`.
@@ -300,6 +302,27 @@ impl Default for GlmAsrSettings {
         Self {
             endpoint: crate::asr::glm::DEFAULT_ENDPOINT.to_string(),
             model: crate::asr::glm::DEFAULT_MODEL.to_string(),
+            send_dictionary: true,
+        }
+    }
+}
+
+/// Settings for StepFun StepAudio ASR. The API key is stored in
+/// `asr_api_keys["stepfun"]`.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Type)]
+#[serde(default)]
+pub struct StepFunAsrSettings {
+    pub endpoint: String,
+    pub model: String,
+    /// Send dictionary terms as hotwords.
+    pub send_dictionary: bool,
+}
+
+impl Default for StepFunAsrSettings {
+    fn default() -> Self {
+        Self {
+            endpoint: crate::asr::stepfun::DEFAULT_ENDPOINT.to_string(),
+            model: crate::asr::stepfun::DEFAULT_MODEL.to_string(),
             send_dictionary: true,
         }
     }
@@ -631,6 +654,8 @@ pub struct AppSettings {
     pub dashscope_asr: DashScopeAsrSettings,
     #[serde(default)]
     pub glm_asr: GlmAsrSettings,
+    #[serde(default)]
+    pub stepfun_asr: StepFunAsrSettings,
     /// API keys for cloud ASR providers, keyed by provider id.
     #[serde(default)]
     pub asr_api_keys: SecretMap,
@@ -644,7 +669,7 @@ fn default_model() -> String {
     "".to_string()
 }
 
-const CURRENT_SETTINGS_SCHEMA_VERSION: u32 = 3;
+const CURRENT_SETTINGS_SCHEMA_VERSION: u32 = 5;
 
 fn default_settings_schema_version() -> u32 {
     CURRENT_SETTINGS_SCHEMA_VERSION
@@ -736,8 +761,10 @@ fn default_auto_submit() -> bool {
     false
 }
 
+/// How many recordings to keep on disk. Transcribed text is never pruned, so
+/// this only bounds the WAV files in the recordings directory.
 fn default_history_limit() -> usize {
-    5
+    50
 }
 
 fn default_recording_retention_period() -> RecordingRetentionPeriod {
@@ -1133,6 +1160,7 @@ pub fn get_default_settings() -> AppSettings {
         cloud_asr_provider: CloudAsrProvider::default(),
         dashscope_asr: DashScopeAsrSettings::default(),
         glm_asr: GlmAsrSettings::default(),
+        stepfun_asr: StepFunAsrSettings::default(),
         asr_api_keys: SecretMap::default(),
     }
 }
@@ -1336,6 +1364,40 @@ fn apply_settings_migrations(
         settings.transcribe_gpu_device = default_transcribe_gpu_device();
         settings.settings_schema_version = CURRENT_SETTINGS_SCHEMA_VERSION;
         updated = true;
+    }
+    if stored_schema_version < 4 {
+        // Each mode now has exactly one shortcut. Clear any second binding so a
+        // shortcut the UI no longer shows cannot keep triggering recordings.
+        for id in [
+            crate::voice::BINDING_DICTATE_ALT,
+            crate::voice::BINDING_TRANSLATE_ALT,
+        ] {
+            if let Some(binding) = settings.bindings.get_mut(id) {
+                if !binding.current_binding.is_empty() {
+                    binding.current_binding = String::new();
+                    updated = true;
+                }
+            }
+        }
+        if settings.settings_schema_version < CURRENT_SETTINGS_SCHEMA_VERSION {
+            settings.settings_schema_version = CURRENT_SETTINGS_SCHEMA_VERSION;
+            updated = true;
+        }
+    }
+    if stored_schema_version < 5 {
+        // `history_limit` used to cap how many transcripts were kept. Text is
+        // never pruned now, so it only bounds recordings on disk and the old
+        // default is needlessly small. Nothing exposes the setting, so a store
+        // still sitting on that default never made a deliberate choice.
+        const LEGACY_HISTORY_LIMIT: usize = 5;
+        if settings.history_limit == LEGACY_HISTORY_LIMIT {
+            settings.history_limit = default_history_limit();
+            updated = true;
+        }
+        if settings.settings_schema_version < CURRENT_SETTINGS_SCHEMA_VERSION {
+            settings.settings_schema_version = CURRENT_SETTINGS_SCHEMA_VERSION;
+            updated = true;
+        }
     }
 
     // The generic GPU choice was removed in favor of Auto or an exact device.
@@ -1732,8 +1794,19 @@ mod tests {
         assert_eq!(settings.asr_provider, AsrProviderKind::Cloud);
         assert_eq!(settings.cloud_asr_provider, CloudAsrProvider::Dashscope);
         assert_eq!(settings.glm_asr.model, "glm-asr-2512");
+        assert_eq!(settings.stepfun_asr.model, "stepaudio-2.5-asr");
+        assert_eq!(settings.stepfun_asr.endpoint, "https://api.stepfun.com/v1");
         let json = serde_json::to_value(&settings).unwrap();
         assert_eq!(json["asr_provider"], "cloud");
+    }
+
+    #[test]
+    fn stepfun_cloud_provider_round_trips() {
+        let settings: AppSettings =
+            serde_json::from_value(serde_json::json!({ "cloud_asr_provider": "stepfun" })).unwrap();
+        assert_eq!(settings.cloud_asr_provider, CloudAsrProvider::Stepfun);
+        let json = serde_json::to_value(&settings).unwrap();
+        assert_eq!(json["cloud_asr_provider"], "stepfun");
     }
 
     #[test]
@@ -1758,6 +1831,55 @@ mod tests {
             settings.settings_schema_version,
             CURRENT_SETTINGS_SCHEMA_VERSION
         );
+    }
+
+    #[test]
+    fn schema_v4_migration_clears_second_shortcuts() {
+        let mut settings = get_default_settings();
+        for id in ["transcribe_alt", "translate_alt"] {
+            settings
+                .bindings
+                .get_mut(id)
+                .expect("alt binding exists")
+                .current_binding = "option+shift+space".into();
+        }
+
+        let raw = serde_json::json!({ "settings_schema_version": 3 });
+        assert!(apply_settings_migrations(&mut settings, &raw));
+        assert_eq!(settings.bindings["transcribe_alt"].current_binding, "");
+        assert_eq!(settings.bindings["translate_alt"].current_binding, "");
+        // The primary shortcuts are untouched.
+        assert!(!settings.bindings["transcribe"].current_binding.is_empty());
+        assert_eq!(
+            settings.settings_schema_version,
+            CURRENT_SETTINGS_SCHEMA_VERSION
+        );
+    }
+
+    #[test]
+    fn schema_v5_migration_lifts_retired_history_limit_default() {
+        // A store already on v4 (shipped before this migration existed) still
+        // has to be lifted off the retired default.
+        let mut settings = get_default_settings();
+        settings.history_limit = 5;
+
+        let raw = serde_json::json!({ "settings_schema_version": 4 });
+        assert!(apply_settings_migrations(&mut settings, &raw));
+        assert_eq!(settings.history_limit, default_history_limit());
+        assert_eq!(
+            settings.settings_schema_version,
+            CURRENT_SETTINGS_SCHEMA_VERSION
+        );
+    }
+
+    #[test]
+    fn schema_v5_migration_keeps_a_deliberate_history_limit() {
+        let mut settings = get_default_settings();
+        settings.history_limit = 200;
+
+        let raw = serde_json::json!({ "settings_schema_version": 4 });
+        apply_settings_migrations(&mut settings, &raw);
+        assert_eq!(settings.history_limit, 200);
     }
 
     #[test]

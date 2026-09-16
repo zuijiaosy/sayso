@@ -3,7 +3,7 @@
 use crate::actions::{paste_and_finish, run_text_model, show_translation_failure};
 use crate::settings::{
     get_settings, write_settings, AsrProviderKind, CloudAsrProvider, DashScopeAsrSettings,
-    DictationPostMode, DictionaryEntry, GlmAsrSettings,
+    DictationPostMode, DictionaryEntry, GlmAsrSettings, StepFunAsrSettings,
 };
 use crate::tray::{set_tray_state, TrayIconState};
 use crate::utils;
@@ -218,6 +218,27 @@ pub fn update_glm_asr_settings(
 
 #[tauri::command]
 #[specta::specta]
+pub fn update_stepfun_asr_settings(
+    app: AppHandle,
+    config: StepFunAsrSettings,
+) -> Result<StepFunAsrSettings, String> {
+    let model = config.model.trim().to_string();
+    if model.is_empty() {
+        return Err("Model cannot be empty".to_string());
+    }
+    let cleaned = StepFunAsrSettings {
+        endpoint: clean_endpoint(&config.endpoint)?,
+        model,
+        send_dictionary: config.send_dictionary,
+    };
+    let mut settings = get_settings(&app);
+    settings.stepfun_asr = cleaned.clone();
+    write_settings(&app, settings);
+    Ok(cleaned)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn update_dashscope_asr_settings(
     app: AppHandle,
     config: DashScopeAsrSettings,
@@ -249,7 +270,10 @@ pub fn update_dashscope_asr_settings(
 #[tauri::command]
 #[specta::specta]
 pub fn set_asr_api_key(app: AppHandle, provider: String, api_key: String) -> Result<(), String> {
-    if provider != crate::asr::dashscope::PROVIDER_ID && provider != crate::asr::glm::PROVIDER_ID {
+    if provider != crate::asr::dashscope::PROVIDER_ID
+        && provider != crate::asr::glm::PROVIDER_ID
+        && provider != crate::asr::stepfun::PROVIDER_ID
+    {
         return Err(format!("Unknown ASR provider: {provider}"));
     }
     let mut settings = get_settings(&app);

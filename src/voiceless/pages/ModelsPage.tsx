@@ -15,6 +15,7 @@ import {
   type CloudAsrProvider,
   type DashScopeAsrSettings,
   type GlmAsrSettings,
+  type StepFunAsrSettings,
   type DictationPostMode,
   type ModelInfo,
 } from "@/bindings";
@@ -262,7 +263,7 @@ const LANGUAGE_CODES = [
 
 /** API key field saved on blur to `asr_api_keys[vendor]`. */
 const CloudApiKeyRow: React.FC<{
-  vendor: "dashscope" | "glm";
+  vendor: CloudAsrProvider;
   description: string;
 }> = ({ vendor, description }) => {
   const { t } = useTranslation();
@@ -380,11 +381,20 @@ const DashscopeForm: React.FC = () => {
   );
 };
 
-const GlmForm: React.FC = () => {
+/**
+ * Endpoint / key / model / hotword form, shared by the vendors that take
+ * dictionary terms as hotwords (Zhipu GLM-ASR and StepFun StepAudio ASR).
+ */
+const HotwordVendorForm: React.FC<{
+  vendor: "glm" | "stepfun";
+  settingsKey: "glm_asr" | "stepfun_asr";
+}> = ({ vendor, settingsKey }) => {
   const { t } = useTranslation();
   const { settings, updateSetting } = useSettings();
-  const stored = settings?.glm_asr;
-  const [draft, setDraft] = useState<GlmAsrSettings | null>(null);
+  const stored = settings?.[settingsKey];
+  const [draft, setDraft] = useState<
+    GlmAsrSettings | StepFunAsrSettings | null
+  >(null);
 
   useEffect(() => {
     if (stored && !draft) setDraft(stored);
@@ -392,16 +402,16 @@ const GlmForm: React.FC = () => {
 
   if (!draft) return null;
 
-  const save = async (next: GlmAsrSettings) => {
+  const save = async (next: GlmAsrSettings | StepFunAsrSettings) => {
     setDraft(next);
-    await updateSetting("glm_asr", next);
+    await updateSetting(settingsKey, next);
   };
 
   return (
     <>
       <Row
         title={t("voiceless.models.cloud.endpoint")}
-        description={t("voiceless.models.glm.endpointDesc")}
+        description={t(`voiceless.models.${vendor}.endpointDesc`)}
         stacked
       >
         <TextInput
@@ -413,8 +423,8 @@ const GlmForm: React.FC = () => {
         />
       </Row>
       <CloudApiKeyRow
-        vendor="glm"
-        description={t("voiceless.models.glm.apiKeyDesc")}
+        vendor={vendor}
+        description={t(`voiceless.models.${vendor}.apiKeyDesc`)}
       />
       <Row title={t("voiceless.models.cloud.model")}>
         <TextInput
@@ -426,8 +436,8 @@ const GlmForm: React.FC = () => {
         />
       </Row>
       <Row
-        title={t("voiceless.models.glm.sendDictionary")}
-        description={t("voiceless.models.glm.sendDictionaryDesc")}
+        title={t(`voiceless.models.${vendor}.sendDictionary`)}
+        description={t(`voiceless.models.${vendor}.sendDictionaryDesc`)}
       >
         <Switch
           checked={draft.send_dictionary}
@@ -481,13 +491,22 @@ const CloudAsrSection: React.FC = () => {
             {t("voiceless.models.cloud.vendorDashscope")}
           </option>
           <option value="glm">{t("voiceless.models.cloud.vendorGlm")}</option>
+          <option value="stepfun">
+            {t("voiceless.models.cloud.vendorStepfun")}
+          </option>
         </SelectInput>
       </Row>
-      {vendor === "glm" ? (
-        <GlmForm key="glm" />
-      ) : (
-        <DashscopeForm key="dashscope" />
+      {vendor === "glm" && (
+        <HotwordVendorForm key="glm" vendor="glm" settingsKey="glm_asr" />
       )}
+      {vendor === "stepfun" && (
+        <HotwordVendorForm
+          key="stepfun"
+          vendor="stepfun"
+          settingsKey="stepfun_asr"
+        />
+      )}
+      {vendor === "dashscope" && <DashscopeForm key="dashscope" />}
       <div className="py-3">
         <Button
           variant="secondary"
@@ -695,11 +714,7 @@ export const ModelsPage: React.FC = () => {
         description={t("voiceless.models.asr.description")}
       >
         <Row
-          title={
-            provider === "local"
-              ? t("voiceless.models.asr.local")
-              : t("voiceless.models.asr.cloud")
-          }
+          title={t("voiceless.models.asr.mode")}
           description={
             provider === "local"
               ? t("voiceless.models.asr.localDesc")

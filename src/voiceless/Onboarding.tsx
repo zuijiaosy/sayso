@@ -8,8 +8,8 @@ import { useSettings } from "@/hooks/useSettings";
 import { useModelStore } from "@/stores/modelStore";
 import type { PageId } from "./SettingsShell";
 import { importSenseVoiceFolder, SENSE_VOICE_ID } from "./pages/ModelsPage";
-import { PermissionRows, usePermissions } from "./pages/PermissionsPage";
-import { FnSettingNotice, useFnKeyUsage } from "./pages/ShortcutsPage";
+import { PermissionRows, usePermissions } from "./pages/permissions";
+import { FnSettingNotice, useFnKeyUsage } from "./pages/HomePage";
 import { Section } from "./ui";
 
 const Choice: React.FC<{
@@ -88,7 +88,7 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
       toast.error(useModelStore.getState().error ?? "");
       return;
     }
-    onDone("shortcuts");
+    onDone("home");
   };
 
   // Finish once the requested download has landed (verified and extracted).
@@ -176,7 +176,7 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
                 const ok = await importSenseVoiceFolder(t);
                 if (ok) {
                   await updateSetting("asr_provider", "local");
-                  onDone("shortcuts");
+                  onDone("home");
                 } else {
                   setPending(null);
                 }

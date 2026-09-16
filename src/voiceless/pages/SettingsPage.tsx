@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { useSettings } from "@/hooks/useSettings";
 import { SUPPORTED_LANGUAGES } from "@/i18n";
 import { Page, Row, Section, SelectInput, Switch } from "../ui";
+import { PermissionsSection } from "./permissions";
 
 export const languageLabel = (code: string, uiLanguage: string) => {
   try {
@@ -21,7 +22,9 @@ export const languageLabel = (code: string, uiLanguage: string) => {
   }
 };
 
-export const GeneralPage: React.FC = () => {
+/** General preferences, permissions and About, reached from the sidebar's
+ * bottom gear button. */
+export const SettingsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { settings, updateSetting, audioDevices, refreshAudioDevices } =
     useSettings();
@@ -42,7 +45,7 @@ export const GeneralPage: React.FC = () => {
   if (!settings) return null;
 
   return (
-    <Page title={t("voiceless.general.title")}>
+    <Page title={t("voiceless.settings.title")}>
       <Section
         icon={<SlidersHorizontal size={20} />}
         title={t("voiceless.general.title")}
@@ -138,6 +141,8 @@ export const GeneralPage: React.FC = () => {
           </SelectInput>
         </Row>
       </Section>
+
+      <PermissionsSection />
 
       <Section icon={<Info size={20} />} title={t("voiceless.general.about")}>
         <Row

@@ -732,11 +732,12 @@
   "voiceless": {
     "appName": "Voiceless",
     "nav": {
-      "shortcuts": "快捷键",
+      "home": "首页",
+      "history": "历史",
+      "usage": "使用情况",
       "models": "模型",
       "dictionary": "词典",
-      "general": "通用",
-      "permissions": "权限"
+      "settings": "设置"
     },
     "common": {
       "save": "保存",
@@ -748,10 +749,11 @@
       "loading": "加载中…",
       "recheck": "重新检查",
       "openSystemSettings": "打开系统设置",
-      "notSet": "未设置"
+      "notSet": "未设置",
+      "copied": "已复制到剪贴板",
+      "loadMore": "加载更多"
     },
     "shortcuts": {
-      "title": "键盘快捷键",
       "dictate": {
         "title": "语音输入",
         "description": "按下开始和停止语音输入。"
@@ -760,9 +762,7 @@
         "title": "翻译",
         "description": "按下开始和停止翻译。"
       },
-      "addAnother": "添加另一个",
       "pressKeys": "请按下快捷键…",
-      "remove": "移除",
       "reset": "恢复默认",
       "activation": {
         "title": "触发方式",
@@ -772,7 +772,7 @@
         "push_to_talk": "仅按住说话"
       },
       "tips": "录音时：按 Esc 或点 ✕ 取消，点 ✓ 结束。先按住 Fn 再按左 Shift，会把正在进行的口述切换为翻译。",
-      "fnHardware": "Fn 键只在 Apple 键盘上有效。使用第三方键盘时，请添加另一个快捷键。",
+      "fnHardware": "Fn 键只在 Apple 键盘上有效。使用第三方键盘时，请改用其他快捷键。",
       "fnWarning": {
         "title": "Fn 键与系统设置冲突",
         "body": "系统设置 → 键盘 →「按下 🌐 键时」目前是「{{action}}」。请改为「不执行任何操作」，否则按 Fn 会同时触发系统功能。",
@@ -786,9 +786,40 @@
         "unknown": "未知"
       },
       "errors": {
-        "set": "无法设置快捷键：{{error}}",
-        "clear": "无法移除快捷键：{{error}}"
+        "set": "无法设置快捷键：{{error}}"
       }
+    },
+    "history": {
+      "filterAll": "全部",
+      "filterDictate": "口述",
+      "filterTranslate": "翻译",
+      "searchPlaceholder": "搜索",
+      "today": "今天",
+      "yesterday": "昨天",
+      "failed": "识别失败",
+      "copy": "复制",
+      "empty": "还没有记录。按下快捷键开始说话吧。",
+      "noResults": "没有匹配的记录。"
+    },
+    "usage": {
+      "weekChars": "本周输入",
+      "totalChars": "累计输入",
+      "sessions": "使用次数",
+      "duration": "说话时长",
+      "speed": "平均速度",
+      "speedUnit": "字 / 分钟",
+      "gain": "比打字快",
+      "gainHint": "以 {{baseline}} 字 / 分钟为基准",
+      "split": "口述 {{dictate}}% · 翻译 {{translate}}%",
+      "minutes": "{{count}} 分钟",
+      "hoursMinutes": "{{hours}} 小时 {{minutes}} 分",
+      "charsUnit": "{{count}} 字",
+      "activeDays": "已打卡 {{count}} 天",
+      "streak": "连续 {{current}} 天 · 最长 {{longest}} 天",
+      "less": "较少",
+      "more": "较多",
+      "share": "分享给好友",
+      "shareText": "我用 Voiceless 累计录入 {{chars}} 字，平均 {{speed}} 字/分钟，比打字快 {{gain}}。当前连续打卡 {{streak}} 天。"
     },
     "models": {
       "title": "模型",
@@ -798,7 +829,8 @@
         "local": "本地识别",
         "localDesc": "离线运行，音频不会离开这台 Mac。",
         "cloud": "云端识别",
-        "cloudDesc": "音频会上传到所选服务商识别。"
+        "cloudDesc": "音频会上传到所选服务商识别。",
+        "mode": "识别方式"
       },
       "local": {
         "title": "本地模型",
@@ -835,7 +867,8 @@
         "saveFailed": "保存失败：{{error}}",
         "vendor": "服务商",
         "vendorDashscope": "阿里云百炼 Qwen-ASR",
-        "vendorGlm": "智谱 GLM-ASR"
+        "vendorGlm": "智谱 GLM-ASR",
+        "vendorStepfun": "阶跃星辰 StepAudio ASR"
       },
       "text": {
         "title": "文本模型",
@@ -863,6 +896,12 @@
         "apiKeyDesc": "在智谱开放平台（bigmodel.cn）创建的 API Key。",
         "sendDictionary": "把词典作为热词",
         "sendDictionaryDesc": "最多发送 100 个标准写法。GLM-ASR 单次最长 30 秒，更长的录音会自动分段识别。"
+      },
+      "stepfun": {
+        "endpointDesc": "默认 https://api.stepfun.com/v1。Step Plan 订阅密钥无法调用该接口。",
+        "apiKeyDesc": "在阶跃星辰开放平台（platform.stepfun.com）「接口密钥」中创建的 API Key。",
+        "sendDictionary": "把词典作为热词",
+        "sendDictionaryDesc": "最多发送 100 个标准写法。仅支持中英文；较长的录音会按 3 分钟分段并行识别。"
       }
     },
     "dictionary": {
@@ -943,6 +982,9 @@
       "cloud": "使用云端识别",
       "cloudDesc": "阿里云百炼或智谱 GLM，音频上传识别。稍后在「模型」中填写 API Key。",
       "finishing": "正在启用模型…"
+    },
+    "settings": {
+      "title": "设置"
     }
   }
 }

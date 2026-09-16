@@ -20,7 +20,7 @@ type Phase = "loading" | "onboarding" | "ready";
 function App() {
   const { t, i18n } = useTranslation();
   const [phase, setPhase] = useState<Phase>("loading");
-  const [page, setPage] = useState<PageId>("shortcuts");
+  const [page, setPage] = useState<PageId>("home");
   const { refreshAudioDevices, refreshOutputDevices, refreshSettings } =
     useSettings();
   const initialized = useRef(false);
@@ -46,7 +46,7 @@ function App() {
             checkMicrophonePermission().catch(() => true),
           ]);
           if (!accessibility || !microphone) {
-            setPage("permissions");
+            setPage("settings");
             await commands.showMainWindowCommand().catch(() => {});
           }
         }

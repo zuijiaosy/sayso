@@ -779,6 +779,10 @@ impl ShortcutAction for TranscribeAction {
                 } else {
                     // Save WAV concurrently with transcription
                     let sample_count = samples.len();
+                    // Recordings are always saved at the pipeline's 16 kHz, so
+                    // the sample count is the session's spoken length.
+                    let audio_ms = (sample_count as i64) * 1000
+                        / crate::audio_toolkit::constants::WHISPER_SAMPLE_RATE as i64;
                     let file_name = format!("handy-{}.wav", chrono::Utc::now().timestamp());
                     let wav_path = hm.recordings_dir().join(&file_name);
                     let wav_path_for_verify = wav_path.clone();
@@ -899,6 +903,8 @@ impl ShortcutAction for TranscribeAction {
                                             true,
                                             None,
                                             None,
+                                            session_mode,
+                                            audio_ms,
                                         ) {
                                             error!("Failed to save history entry: {}", err);
                                         }
@@ -916,6 +922,8 @@ impl ShortcutAction for TranscribeAction {
                                     processed.post_process_prompt.is_some(),
                                     processed.post_processed_text.clone(),
                                     processed.post_process_prompt.clone(),
+                                    session_mode,
+                                    audio_ms,
                                 ) {
                                     error!("Failed to save history entry: {}", err);
                                 }
@@ -954,6 +962,8 @@ impl ShortcutAction for TranscribeAction {
                                     uses_text_model,
                                     None,
                                     None,
+                                    session_mode,
+                                    audio_ms,
                                 ) {
                                     error!("Failed to save failed history entry: {}", save_err);
                                 }

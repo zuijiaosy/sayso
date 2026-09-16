@@ -1,8 +1,9 @@
 use crate::actions::process_transcription_output;
 use crate::managers::{
-    history::{HistoryManager, PaginatedHistory},
+    history::{HistoryManager, PaginatedHistory, UsageDay},
     transcription::TranscriptionManager,
 };
+use crate::voice::SessionMode;
 use std::sync::Arc;
 use tauri::{AppHandle, State};
 
@@ -13,10 +14,25 @@ pub async fn get_history_entries(
     history_manager: State<'_, Arc<HistoryManager>>,
     cursor: Option<i64>,
     limit: Option<usize>,
+    mode: Option<SessionMode>,
+    query: Option<String>,
 ) -> Result<PaginatedHistory, String> {
     history_manager
-        .get_history_entries(cursor, limit)
+        .get_history_entries(cursor, limit, mode, query)
         .await
+        .map_err(|e| e.to_string())
+}
+
+/// Per-day usage totals backing the Usage page.
+#[tauri::command]
+#[specta::specta]
+pub async fn get_usage_days(
+    _app: AppHandle,
+    history_manager: State<'_, Arc<HistoryManager>>,
+    mode: Option<SessionMode>,
+) -> Result<Vec<UsageDay>, String> {
+    history_manager
+        .get_usage_days(mode)
         .map_err(|e| e.to_string())
 }
 
@@ -72,6 +88,12 @@ pub async fn retry_history_entry_transcription(
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("History entry {} not found", id))?;
+
+    // Cleanup prunes recordings but keeps the text, so an entry can outlive its
+    // audio. Those cannot be transcribed again.
+    if entry.file_name.is_empty() {
+        return Err("Recording has been cleaned up".to_string());
+    }
 
     let audio_path = history_manager.get_audio_file_path(&entry.file_name);
     let samples = crate::audio_toolkit::read_wav_samples(&audio_path)

@@ -665,6 +665,14 @@ async updateGlmAsrSettings(config: GlmAsrSettings) : Promise<Result<GlmAsrSettin
     else return { status: "error", error: e  as any };
 }
 },
+async updateStepfunAsrSettings(config: StepFunAsrSettings) : Promise<Result<StepFunAsrSettings, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_stepfun_asr_settings", { config }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * Merge imported text into the dictionary (or replace it) and save.
  */
@@ -1029,9 +1037,20 @@ async unloadModelManually() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async getHistoryEntries(cursor: number | null, limit: number | null) : Promise<Result<PaginatedHistory, string>> {
+async getHistoryEntries(cursor: number | null, limit: number | null, mode: SessionMode | null, query: string | null) : Promise<Result<PaginatedHistory, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("get_history_entries", { cursor, limit }) };
+    return { status: "ok", data: await TAURI_INVOKE("get_history_entries", { cursor, limit, mode, query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Per-day usage totals backing the Usage page.
+ */
+async getUsageDays(mode: SessionMode | null) : Promise<Result<UsageDay[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_usage_days", { mode }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1202,7 +1221,7 @@ dictionary?: DictionaryEntry[];
 /**
  * Voiceless: speech recognition engine.
  */
-asr_provider?: AsrProviderKind; cloud_asr_provider?: CloudAsrProvider; dashscope_asr?: DashScopeAsrSettings; glm_asr?: GlmAsrSettings; 
+asr_provider?: AsrProviderKind; cloud_asr_provider?: CloudAsrProvider; dashscope_asr?: DashScopeAsrSettings; glm_asr?: GlmAsrSettings; stepfun_asr?: StepFunAsrSettings; 
 /**
  * API keys for cloud ASR providers, keyed by provider id.
  */
@@ -1236,7 +1255,11 @@ export type CloudAsrProvider =
 /**
  * Zhipu BigModel GLM-ASR.
  */
-"glm"
+"glm" | 
+/**
+ * StepFun (阶跃星辰) StepAudio ASR.
+ */
+"stepfun"
 export type CustomSounds = { start: boolean; stop: boolean }
 /**
  * Settings for the DashScope Qwen-ASR provider. The API key is stored in
@@ -1336,7 +1359,12 @@ export type GlmAsrSettings = { endpoint: string; model: string;
  */
 send_dictionary: boolean }
 export type GpuDeviceOption = { id: string; name: string; total_vram_mb: number }
-export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string; post_processed_text: string | null; post_process_prompt: string | null; post_process_requested: boolean }
+export type HistoryEntry = { id: number; 
+/**
+ * Empty once the recording has been cleaned up. The text is kept forever;
+ * only the WAV is pruned, so an entry with no file name cannot be retried.
+ */
+file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string; post_processed_text: string | null; post_process_prompt: string | null; post_process_requested: boolean; mode: SessionMode; audio_ms: number }
 export type HistoryUpdatePayload = { action: "added"; entry: HistoryEntry } | { action: "updated"; entry: HistoryEntry } | { action: "deleted"; id: number } | { action: "toggled"; id: number }
 /**
  * Result of changing keyboard implementation
@@ -1457,6 +1485,15 @@ export type ShortcutActivation =
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
 export type SoundTheme = "marimba" | "pop" | "custom"
 /**
+ * Settings for StepFun StepAudio ASR. The API key is stored in
+ * `asr_api_keys["stepfun"]`.
+ */
+export type StepFunAsrSettings = { endpoint: string; model: string; 
+/**
+ * Send dictionary terms as hotwords.
+ */
+send_dictionary: boolean }
+/**
  * Phase of the streaming overlay card, emitted to drive its UI state.
  */
 export type StreamPhase = 
@@ -1511,6 +1548,15 @@ prompt_name: string }
  */
 export type TranslationFailedEvent = { failure: FailedTranslation }
 export type TypingTool = "auto" | "wtype" | "kwtype" | "dotool" | "ydotool" | "xdotool"
+/**
+ * One day's totals for a single mode, as stored in `usage_daily`. Weekly and
+ * all-time figures are derived from these rows by the frontend.
+ */
+export type UsageDay = { 
+/**
+ * Local calendar day, `YYYY-MM-DD`.
+ */
+day: string; mode: SessionMode; sessions: number; chars: number; audio_ms: number }
 export type VadBackend = "silero" | "earshot"
 /**
  * Current session mode, target language and any pending translation failure.

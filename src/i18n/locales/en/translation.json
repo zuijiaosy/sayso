@@ -732,11 +732,12 @@
   "voiceless": {
     "appName": "Voiceless",
     "nav": {
-      "shortcuts": "Shortcuts",
+      "home": "Home",
+      "history": "History",
+      "usage": "Usage",
       "models": "Models",
       "dictionary": "Dictionary",
-      "general": "General",
-      "permissions": "Permissions"
+      "settings": "Settings"
     },
     "common": {
       "save": "Save",
@@ -748,10 +749,11 @@
       "loading": "Loading…",
       "recheck": "Check again",
       "openSystemSettings": "Open System Settings",
-      "notSet": "Not set"
+      "notSet": "Not set",
+      "copied": "Copied to clipboard",
+      "loadMore": "Load more"
     },
     "shortcuts": {
-      "title": "Keyboard shortcuts",
       "dictate": {
         "title": "Dictate",
         "description": "Press to start and stop voice input."
@@ -760,9 +762,7 @@
         "title": "Translate",
         "description": "Press to start and stop translation."
       },
-      "addAnother": "Add another",
       "pressKeys": "Press keys…",
-      "remove": "Remove",
       "reset": "Reset",
       "activation": {
         "title": "Activation",
@@ -772,7 +772,7 @@
         "push_to_talk": "Hold to talk only"
       },
       "tips": "While recording: press Esc or click ✕ to cancel, click ✓ to finish. Holding Fn and then pressing Left Shift switches the current dictation to translation.",
-      "fnHardware": "Fn only works on Apple keyboards. Add another shortcut if you use a third-party keyboard.",
+      "fnHardware": "Fn only works on Apple keyboards. Choose a different shortcut if you use a third-party keyboard.",
       "fnWarning": {
         "title": "The Fn key conflicts with a system setting",
         "body": "System Settings → Keyboard → “Press 🌐 key to” is set to “{{action}}”. Change it to “Do Nothing”, otherwise Fn also triggers the system action.",
@@ -786,9 +786,40 @@
         "unknown": "Unknown"
       },
       "errors": {
-        "set": "Could not set shortcut: {{error}}",
-        "clear": "Could not remove shortcut: {{error}}"
+        "set": "Could not set shortcut: {{error}}"
       }
+    },
+    "history": {
+      "filterAll": "All",
+      "filterDictate": "Dictation",
+      "filterTranslate": "Translation",
+      "searchPlaceholder": "Search",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "failed": "Recognition failed",
+      "copy": "Copy",
+      "empty": "Nothing here yet. Press your shortcut and start speaking.",
+      "noResults": "No transcripts match that search."
+    },
+    "usage": {
+      "weekChars": "This week",
+      "totalChars": "All time",
+      "sessions": "Recordings",
+      "duration": "Time spoken",
+      "speed": "Average speed",
+      "speedUnit": "characters / minute",
+      "gain": "Faster than typing",
+      "gainHint": "vs. {{baseline}} characters / minute",
+      "split": "Dictation {{dictate}}% · Translation {{translate}}%",
+      "minutes": "{{count}} min",
+      "hoursMinutes": "{{hours}} h {{minutes}} min",
+      "charsUnit": "{{count}} characters",
+      "activeDays": "{{count}} active days",
+      "streak": "Streak {{current}} · longest {{longest}}",
+      "less": "Less",
+      "more": "More",
+      "share": "Share",
+      "shareText": "I have dictated {{chars}} characters with Voiceless, averaging {{speed}} characters a minute — {{gain}} faster than typing. Current streak: {{streak}} days."
     },
     "models": {
       "title": "Models",
@@ -798,7 +829,8 @@
         "local": "On device",
         "localDesc": "Runs offline; audio never leaves this Mac.",
         "cloud": "Cloud",
-        "cloudDesc": "Audio is uploaded to the selected provider."
+        "cloudDesc": "Audio is uploaded to the selected provider.",
+        "mode": "Recognition"
       },
       "local": {
         "title": "Local model",
@@ -835,7 +867,8 @@
         "saveFailed": "Could not save: {{error}}",
         "vendor": "Provider",
         "vendorDashscope": "Alibaba Cloud Qwen-ASR",
-        "vendorGlm": "Zhipu GLM-ASR"
+        "vendorGlm": "Zhipu GLM-ASR",
+        "vendorStepfun": "StepFun StepAudio ASR"
       },
       "text": {
         "title": "Text model",
@@ -863,6 +896,12 @@
         "apiKeyDesc": "An API key from the Zhipu BigModel platform (bigmodel.cn).",
         "sendDictionary": "Send dictionary as hotwords",
         "sendDictionaryDesc": "Up to 100 terms. GLM-ASR accepts 30 seconds per request; longer recordings are split automatically."
+      },
+      "stepfun": {
+        "endpointDesc": "Defaults to https://api.stepfun.com/v1. Step Plan subscription keys cannot use this endpoint.",
+        "apiKeyDesc": "An API key from the StepFun platform (platform.stepfun.com, under Interface keys).",
+        "sendDictionary": "Send dictionary as hotwords",
+        "sendDictionaryDesc": "Up to 100 terms. Chinese and English only; long recordings are split into 3-minute chunks and recognized in parallel."
       }
     },
     "dictionary": {
@@ -943,6 +982,9 @@
       "cloud": "Use cloud recognition",
       "cloudDesc": "Alibaba Cloud or Zhipu GLM; audio is uploaded. Add the API key later under Models.",
       "finishing": "Enabling the model…"
+    },
+    "settings": {
+      "title": "Settings"
     }
   }
 }

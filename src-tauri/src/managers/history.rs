@@ -1,12 +1,13 @@
+use crate::voice::SessionMode;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local, Utc};
 use log::{debug, error, info};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, params_from_iter, types::Value, Connection, OptionalExtension};
 use rusqlite_migration::{Migrations, M};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 use tauri_specta::Event;
 
@@ -31,7 +32,24 @@ static MIGRATIONS: &[M] = &[
     M::up("ALTER TABLE transcription_history ADD COLUMN post_processed_text TEXT;"),
     M::up("ALTER TABLE transcription_history ADD COLUMN post_process_prompt TEXT;"),
     M::up("ALTER TABLE transcription_history ADD COLUMN post_process_requested BOOLEAN NOT NULL DEFAULT 0;"),
+    M::up("ALTER TABLE transcription_history ADD COLUMN mode TEXT NOT NULL DEFAULT 'dictate';"),
+    M::up("ALTER TABLE transcription_history ADD COLUMN audio_ms INTEGER NOT NULL DEFAULT 0;"),
+    M::up(
+        "CREATE TABLE IF NOT EXISTS usage_daily (
+            day TEXT NOT NULL,
+            mode TEXT NOT NULL,
+            sessions INTEGER NOT NULL DEFAULT 0,
+            chars INTEGER NOT NULL DEFAULT 0,
+            audio_ms INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (day, mode)
+        );",
+    ),
 ];
+
+/// Every column of `transcription_history`, in the order `map_history_entry`
+/// reads them. Kept in one place so a new column only has to be added once.
+const ENTRY_COLUMNS: &str = "id, file_name, timestamp, saved, title, transcription_text, \
+     post_processed_text, post_process_prompt, post_process_requested, mode, audio_ms";
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct PaginatedHistory {
@@ -55,6 +73,8 @@ pub enum HistoryUpdatePayload {
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct HistoryEntry {
     pub id: i64,
+    /// Empty once the recording has been cleaned up. The text is kept forever;
+    /// only the WAV is pruned, so an entry with no file name cannot be retried.
     pub file_name: String,
     pub timestamp: i64,
     pub saved: bool,
@@ -63,6 +83,43 @@ pub struct HistoryEntry {
     pub post_processed_text: Option<String>,
     pub post_process_prompt: Option<String>,
     pub post_process_requested: bool,
+    pub mode: SessionMode,
+    pub audio_ms: i64,
+}
+
+/// One day's totals for a single mode, as stored in `usage_daily`. Weekly and
+/// all-time figures are derived from these rows by the frontend.
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct UsageDay {
+    /// Local calendar day, `YYYY-MM-DD`.
+    pub day: String,
+    pub mode: SessionMode,
+    pub sessions: i64,
+    pub chars: i64,
+    pub audio_ms: i64,
+}
+
+fn mode_to_str(mode: SessionMode) -> &'static str {
+    match mode {
+        SessionMode::Dictate => "dictate",
+        SessionMode::Translate => "translate",
+    }
+}
+
+fn mode_from_str(value: &str) -> SessionMode {
+    match value {
+        "translate" => SessionMode::Translate,
+        _ => SessionMode::Dictate,
+    }
+}
+
+/// Neutralise LIKE wildcards so a search for "100%" matches literally. Used
+/// with `ESCAPE '\'` on the SQL side.
+fn escape_like(needle: &str) -> String {
+    needle
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
 }
 
 pub struct HistoryManager {
@@ -207,6 +264,18 @@ impl HistoryManager {
             post_processed_text: row.get("post_processed_text")?,
             post_process_prompt: row.get("post_process_prompt")?,
             post_process_requested: row.get("post_process_requested")?,
+            mode: mode_from_str(&row.get::<_, String>("mode")?),
+            audio_ms: row.get("audio_ms")?,
+        })
+    }
+
+    fn map_usage_day(row: &rusqlite::Row<'_>) -> rusqlite::Result<UsageDay> {
+        Ok(UsageDay {
+            day: row.get("day")?,
+            mode: mode_from_str(&row.get::<_, String>("mode")?),
+            sessions: row.get("sessions")?,
+            chars: row.get("chars")?,
+            audio_ms: row.get("audio_ms")?,
         })
     }
 
@@ -214,8 +283,74 @@ impl HistoryManager {
         &self.recordings_dir
     }
 
+    /// Roll a new entry into `usage_daily`. Entries saved with no text are
+    /// failures kept for retry, so they must not count towards usage.
+    fn record_usage_with_conn(conn: &Connection, entry: &HistoryEntry) -> Result<()> {
+        let text = entry
+            .post_processed_text
+            .as_deref()
+            .unwrap_or(&entry.transcription_text);
+        if text.trim().is_empty() {
+            return Ok(());
+        }
+
+        // Bucket by local calendar day: the Usage page's streaks and "this
+        // week" are what the user experienced in their own timezone.
+        let day = DateTime::from_timestamp(entry.timestamp, 0)
+            .map(|dt| dt.with_timezone(&Local))
+            .unwrap_or_else(Local::now)
+            .format("%Y-%m-%d")
+            .to_string();
+
+        conn.execute(
+            "INSERT INTO usage_daily (day, mode, sessions, chars, audio_ms)
+             VALUES (?1, ?2, 1, ?3, ?4)
+             ON CONFLICT(day, mode) DO UPDATE SET
+                 sessions = sessions + 1,
+                 chars = chars + excluded.chars,
+                 audio_ms = audio_ms + excluded.audio_ms",
+            params![
+                day,
+                mode_to_str(entry.mode),
+                text.chars().count() as i64,
+                entry.audio_ms,
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    /// Per-day usage totals, oldest first. Weekly/all-time figures and streaks
+    /// are derived from these rows by the Usage page.
+    pub fn get_usage_days(&self, mode: Option<SessionMode>) -> Result<Vec<UsageDay>> {
+        let conn = self.get_connection()?;
+        Self::get_usage_days_with_conn(&conn, mode)
+    }
+
+    fn get_usage_days_with_conn(
+        conn: &Connection,
+        mode: Option<SessionMode>,
+    ) -> Result<Vec<UsageDay>> {
+        let mut sql = String::from("SELECT day, mode, sessions, chars, audio_ms FROM usage_daily");
+        let mut args: Vec<Value> = Vec::new();
+
+        if let Some(mode) = mode {
+            sql.push_str(" WHERE mode = ?");
+            args.push(Value::Text(mode_to_str(mode).to_string()));
+        }
+        sql.push_str(" ORDER BY day");
+
+        let mut stmt = conn.prepare(&sql)?;
+        let days = stmt
+            .query_map(params_from_iter(args.iter()), Self::map_usage_day)?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        Ok(days)
+    }
+
     /// Save a new history entry to the database.
     /// The WAV file should already have been written to the recordings directory.
+    #[allow(clippy::too_many_arguments)]
     pub fn save_entry(
         &self,
         file_name: String,
@@ -223,6 +358,8 @@ impl HistoryManager {
         post_process_requested: bool,
         post_processed_text: Option<String>,
         post_process_prompt: Option<String>,
+        mode: SessionMode,
+        audio_ms: i64,
     ) -> Result<HistoryEntry> {
         let timestamp = Utc::now().timestamp();
         let title = self.format_timestamp_title(timestamp);
@@ -237,8 +374,10 @@ impl HistoryManager {
                 transcription_text,
                 post_processed_text,
                 post_process_prompt,
-                post_process_requested
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                post_process_requested,
+                mode,
+                audio_ms
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 &file_name,
                 timestamp,
@@ -248,6 +387,8 @@ impl HistoryManager {
                 &post_processed_text,
                 &post_process_prompt,
                 post_process_requested,
+                mode_to_str(mode),
+                audio_ms,
             ],
         )?;
 
@@ -261,7 +402,11 @@ impl HistoryManager {
             post_processed_text,
             post_process_prompt,
             post_process_requested,
+            mode,
+            audio_ms,
         };
+
+        Self::record_usage_with_conn(&conn, &entry)?;
 
         debug!("Saved history entry with id {}", entry.id);
 
@@ -306,13 +451,11 @@ impl HistoryManager {
             return Err(anyhow!("History entry {} not found", id));
         }
 
-        let entry = conn
-            .query_row(
-                "SELECT id, file_name, timestamp, saved, title, transcription_text, post_processed_text, post_process_prompt, post_process_requested
-                 FROM transcription_history WHERE id = ?1",
-                params![id],
-                Self::map_history_entry,
-            )?;
+        let entry = conn.query_row(
+            &format!("SELECT {ENTRY_COLUMNS} FROM transcription_history WHERE id = ?1"),
+            params![id],
+            Self::map_history_entry,
+        )?;
 
         debug!("Updated transcription for history entry {}", id);
 
@@ -327,8 +470,12 @@ impl HistoryManager {
         Ok(entry)
     }
 
+    /// Prune old *recordings*. Transcribed text is kept forever — the History
+    /// and Usage pages read it — so cleanup only deletes WAV files and clears
+    /// the entry's `file_name` to mark the recording as gone.
     pub fn cleanup_old_entries(&self) -> Result<()> {
         let retention_period = crate::settings::get_recording_retention_period(&self.app_handle);
+        let conn = self.get_connection()?;
 
         match retention_period {
             crate::settings::RecordingRetentionPeriod::Never => {
@@ -338,51 +485,59 @@ impl HistoryManager {
             crate::settings::RecordingRetentionPeriod::PreserveLimit => {
                 // Use the old count-based logic with history_limit
                 let limit = crate::settings::get_history_limit(&self.app_handle);
-                self.cleanup_by_count(limit)
+                Self::cleanup_by_count_with_conn(&conn, &self.recordings_dir, limit)
             }
             _ => {
                 // Use time-based logic
-                self.cleanup_by_time(retention_period)
+                Self::cleanup_by_time_with_conn(&conn, &self.recordings_dir, retention_period)
             }
         }
     }
 
-    fn delete_entries_and_files(&self, entries: &[(i64, String)]) -> Result<usize> {
+    fn delete_audio_files(
+        conn: &Connection,
+        recordings_dir: &Path,
+        entries: &[(i64, String)],
+    ) -> Result<usize> {
         if entries.is_empty() {
             return Ok(0);
         }
 
-        let conn = self.get_connection()?;
         let mut deleted_count = 0;
 
         for (id, file_name) in entries {
-            // Delete database entry
-            conn.execute(
-                "DELETE FROM transcription_history WHERE id = ?1",
-                params![id],
-            )?;
-
-            // Delete WAV file
-            let file_path = self.recordings_dir.join(file_name);
+            let file_path = recordings_dir.join(file_name);
             if file_path.exists() {
                 if let Err(e) = fs::remove_file(&file_path) {
                     error!("Failed to delete WAV file {}: {}", file_name, e);
-                } else {
-                    debug!("Deleted old WAV file: {}", file_name);
-                    deleted_count += 1;
+                    // Keep the file name so a later pass retries the delete.
+                    continue;
                 }
+                debug!("Deleted old WAV file: {}", file_name);
             }
+
+            // An empty file name is how the rest of the app tells "the text is
+            // here but the recording is gone" (retry is refused for these).
+            conn.execute(
+                "UPDATE transcription_history SET file_name = '' WHERE id = ?1",
+                params![id],
+            )?;
+            deleted_count += 1;
         }
 
         Ok(deleted_count)
     }
 
-    fn cleanup_by_count(&self, limit: usize) -> Result<()> {
-        let conn = self.get_connection()?;
-
-        // Get all entries that are not saved, ordered by timestamp desc
+    fn cleanup_by_count_with_conn(
+        conn: &Connection,
+        recordings_dir: &Path,
+        limit: usize,
+    ) -> Result<()> {
+        // Entries that still have a recording, newest first.
         let mut stmt = conn.prepare(
-            "SELECT id, file_name FROM transcription_history WHERE saved = 0 ORDER BY timestamp DESC"
+            "SELECT id, file_name FROM transcription_history
+             WHERE saved = 0 AND file_name != ''
+             ORDER BY timestamp DESC",
         )?;
 
         let rows = stmt.query_map([], |row| {
@@ -396,22 +551,21 @@ impl HistoryManager {
 
         if entries.len() > limit {
             let entries_to_delete = &entries[limit..];
-            let deleted_count = self.delete_entries_and_files(entries_to_delete)?;
+            let deleted_count = Self::delete_audio_files(conn, recordings_dir, entries_to_delete)?;
 
             if deleted_count > 0 {
-                debug!("Cleaned up {} old history entries by count", deleted_count);
+                debug!("Cleaned up {} old recordings by count", deleted_count);
             }
         }
 
         Ok(())
     }
 
-    fn cleanup_by_time(
-        &self,
+    fn cleanup_by_time_with_conn(
+        conn: &Connection,
+        recordings_dir: &Path,
         retention_period: crate::settings::RecordingRetentionPeriod,
     ) -> Result<()> {
-        let conn = self.get_connection()?;
-
         // Calculate cutoff timestamp (current time minus retention period)
         let now = Utc::now().timestamp();
         let cutoff_timestamp = match retention_period {
@@ -421,9 +575,10 @@ impl HistoryManager {
             _ => unreachable!("Should not reach here"),
         };
 
-        // Get all unsaved entries older than the cutoff timestamp
+        // Recordings older than the cutoff that have not been kept explicitly.
         let mut stmt = conn.prepare(
-            "SELECT id, file_name FROM transcription_history WHERE saved = 0 AND timestamp < ?1",
+            "SELECT id, file_name FROM transcription_history
+             WHERE saved = 0 AND file_name != '' AND timestamp < ?1",
         )?;
 
         let rows = stmt.query_map(params![cutoff_timestamp], |row| {
@@ -435,11 +590,11 @@ impl HistoryManager {
             entries_to_delete.push(row?);
         }
 
-        let deleted_count = self.delete_entries_and_files(&entries_to_delete)?;
+        let deleted_count = Self::delete_audio_files(conn, recordings_dir, &entries_to_delete)?;
 
         if deleted_count > 0 {
             debug!(
-                "Cleaned up {} old history entries based on retention period",
+                "Cleaned up {} old recordings based on retention period",
                 deleted_count
             );
         }
@@ -451,50 +606,59 @@ impl HistoryManager {
         &self,
         cursor: Option<i64>,
         limit: Option<usize>,
+        mode: Option<SessionMode>,
+        query: Option<String>,
     ) -> Result<PaginatedHistory> {
         let conn = self.get_connection()?;
+        Self::query_entries_with_conn(&conn, cursor, limit, mode, query)
+    }
+
+    fn query_entries_with_conn(
+        conn: &Connection,
+        cursor: Option<i64>,
+        limit: Option<usize>,
+        mode: Option<SessionMode>,
+        query: Option<String>,
+    ) -> Result<PaginatedHistory> {
         let limit = limit.map(|l| l.min(100));
 
-        let mut entries: Vec<HistoryEntry> = match (cursor, limit) {
-            (Some(cursor_id), Some(lim)) => {
-                let fetch_count = (lim + 1) as i64;
-                let mut stmt = conn.prepare(
-                    "SELECT id, file_name, timestamp, saved, title, transcription_text, post_processed_text, post_process_prompt, post_process_requested
-                     FROM transcription_history
-                     WHERE id < ?1
-                     ORDER BY id DESC
-                     LIMIT ?2",
-                )?;
-                let result = stmt
-                    .query_map(params![cursor_id, fetch_count], Self::map_history_entry)?
-                    .collect::<std::result::Result<Vec<_>, _>>()?;
-                result
-            }
-            (None, Some(lim)) => {
-                let fetch_count = (lim + 1) as i64;
-                let mut stmt = conn.prepare(
-                    "SELECT id, file_name, timestamp, saved, title, transcription_text, post_processed_text, post_process_prompt, post_process_requested
-                     FROM transcription_history
-                     ORDER BY id DESC
-                     LIMIT ?1",
-                )?;
-                let result = stmt
-                    .query_map(params![fetch_count], Self::map_history_entry)?
-                    .collect::<std::result::Result<Vec<_>, _>>()?;
-                result
-            }
-            (_, None) => {
-                let mut stmt = conn.prepare(
-                    "SELECT id, file_name, timestamp, saved, title, transcription_text, post_processed_text, post_process_prompt, post_process_requested
-                     FROM transcription_history
-                     ORDER BY id DESC",
-                )?;
-                let result = stmt
-                    .query_map([], Self::map_history_entry)?
-                    .collect::<std::result::Result<Vec<_>, _>>()?;
-                result
-            }
-        };
+        let mut sql = format!("SELECT {ENTRY_COLUMNS} FROM transcription_history");
+        let mut clauses: Vec<&str> = Vec::new();
+        let mut args: Vec<Value> = Vec::new();
+
+        if let Some(cursor_id) = cursor {
+            clauses.push("id < ?");
+            args.push(Value::Integer(cursor_id));
+        }
+        if let Some(mode) = mode {
+            clauses.push("mode = ?");
+            args.push(Value::Text(mode_to_str(mode).to_string()));
+        }
+        if let Some(needle) = query.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
+            clauses.push(
+                "(transcription_text LIKE ? ESCAPE '\\' \
+                  OR post_processed_text LIKE ? ESCAPE '\\')",
+            );
+            let pattern = format!("%{}%", escape_like(needle));
+            args.push(Value::Text(pattern.clone()));
+            args.push(Value::Text(pattern));
+        }
+
+        if !clauses.is_empty() {
+            sql.push_str(" WHERE ");
+            sql.push_str(&clauses.join(" AND "));
+        }
+        sql.push_str(" ORDER BY id DESC");
+        if let Some(lim) = limit {
+            // Fetch one extra row to tell whether another page exists.
+            sql.push_str(" LIMIT ?");
+            args.push(Value::Integer(lim as i64 + 1));
+        }
+
+        let mut stmt = conn.prepare(&sql)?;
+        let mut entries = stmt
+            .query_map(params_from_iter(args.iter()), Self::map_history_entry)?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
 
         let has_more = limit.is_some_and(|lim| entries.len() > lim);
         if has_more {
@@ -506,21 +670,12 @@ impl HistoryManager {
 
     #[cfg(test)]
     fn get_latest_entry_with_conn(conn: &Connection) -> Result<Option<HistoryEntry>> {
-        let mut stmt = conn.prepare(
-            "SELECT
-                id,
-                file_name,
-                timestamp,
-                saved,
-                title,
-                transcription_text,
-                post_processed_text,
-                post_process_prompt,
-                post_process_requested
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {ENTRY_COLUMNS}
              FROM transcription_history
              ORDER BY timestamp DESC
              LIMIT 1",
-        )?;
+        ))?;
 
         let entry = stmt.query_row([], Self::map_history_entry).optional()?;
         Ok(entry)
@@ -533,22 +688,13 @@ impl HistoryManager {
     }
 
     fn get_latest_completed_entry_with_conn(conn: &Connection) -> Result<Option<HistoryEntry>> {
-        let mut stmt = conn.prepare(
-            "SELECT
-                id,
-                file_name,
-                timestamp,
-                saved,
-                title,
-                transcription_text,
-                post_processed_text,
-                post_process_prompt,
-                post_process_requested
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {ENTRY_COLUMNS}
              FROM transcription_history
              WHERE transcription_text != ''
              ORDER BY timestamp DESC
              LIMIT 1",
-        )?;
+        ))?;
 
         let entry = stmt.query_row([], Self::map_history_entry).optional()?;
         Ok(entry)
@@ -587,20 +733,9 @@ impl HistoryManager {
 
     pub async fn get_entry_by_id(&self, id: i64) -> Result<Option<HistoryEntry>> {
         let conn = self.get_connection()?;
-        let mut stmt = conn.prepare(
-            "SELECT
-                id,
-                file_name,
-                timestamp,
-                saved,
-                title,
-                transcription_text,
-                post_processed_text,
-                post_process_prompt,
-                post_process_requested
-             FROM transcription_history
-             WHERE id = ?1",
-        )?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {ENTRY_COLUMNS} FROM transcription_history WHERE id = ?1",
+        ))?;
 
         let entry = stmt.query_row([id], Self::map_history_entry).optional()?;
 
@@ -666,10 +801,20 @@ mod tests {
                 transcription_text TEXT NOT NULL,
                 post_processed_text TEXT,
                 post_process_prompt TEXT,
-                post_process_requested BOOLEAN NOT NULL DEFAULT 0
+                post_process_requested BOOLEAN NOT NULL DEFAULT 0,
+                mode TEXT NOT NULL DEFAULT 'dictate',
+                audio_ms INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE usage_daily (
+                day TEXT NOT NULL,
+                mode TEXT NOT NULL,
+                sessions INTEGER NOT NULL DEFAULT 0,
+                chars INTEGER NOT NULL DEFAULT 0,
+                audio_ms INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (day, mode)
             );",
         )
-        .expect("create transcription_history table");
+        .expect("create history tables");
         conn
     }
 
@@ -683,8 +828,10 @@ mod tests {
                 transcription_text,
                 post_processed_text,
                 post_process_prompt,
-                post_process_requested
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                post_process_requested,
+                mode,
+                audio_ms
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 format!("handy-{}.wav", timestamp),
                 timestamp,
@@ -694,9 +841,33 @@ mod tests {
                 post_processed,
                 Option::<String>::None,
                 false,
+                "dictate",
+                1000,
             ],
         )
         .expect("insert history entry");
+    }
+
+    fn entry_for_usage(
+        timestamp: i64,
+        text: &str,
+        post_processed: Option<&str>,
+        mode: SessionMode,
+        audio_ms: i64,
+    ) -> HistoryEntry {
+        HistoryEntry {
+            id: 0,
+            file_name: String::new(),
+            timestamp,
+            saved: false,
+            title: String::new(),
+            transcription_text: text.to_string(),
+            post_processed_text: post_processed.map(str::to_string),
+            post_process_prompt: None,
+            post_process_requested: false,
+            mode,
+            audio_ms,
+        }
     }
 
     #[test]
@@ -733,5 +904,165 @@ mod tests {
 
         assert_eq!(entry.timestamp, 100);
         assert_eq!(entry.transcription_text, "completed");
+    }
+
+    #[test]
+    fn cleanup_by_count_prunes_recordings_but_keeps_text() {
+        let conn = setup_conn();
+        let dir = tempfile::tempdir().expect("temp recordings dir");
+
+        for timestamp in [100, 200, 300] {
+            insert_entry(&conn, timestamp, "kept text", None);
+            fs::write(dir.path().join(format!("handy-{timestamp}.wav")), b"wav")
+                .expect("write fake recording");
+        }
+
+        HistoryManager::cleanup_by_count_with_conn(&conn, dir.path(), 1).expect("cleanup by count");
+
+        // The newest recording survives; the older two lose only their audio.
+        assert!(dir.path().join("handy-300.wav").exists());
+        assert!(!dir.path().join("handy-200.wav").exists());
+        assert!(!dir.path().join("handy-100.wav").exists());
+
+        let page = HistoryManager::query_entries_with_conn(&conn, None, None, None, None)
+            .expect("query entries");
+        assert_eq!(page.entries.len(), 3, "text is never deleted by cleanup");
+        let by_timestamp = |ts: i64| {
+            page.entries
+                .iter()
+                .find(|e| e.timestamp == ts)
+                .expect("entry exists")
+        };
+        assert_eq!(by_timestamp(300).file_name, "handy-300.wav");
+        assert_eq!(by_timestamp(200).file_name, "");
+        assert_eq!(by_timestamp(100).transcription_text, "kept text");
+    }
+
+    #[test]
+    fn query_entries_filters_by_mode_and_text() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "hello world", None);
+        insert_entry(&conn, 200, "raw text", Some("polished hello"));
+        conn.execute(
+            "UPDATE transcription_history SET mode = 'translate' WHERE timestamp = 200",
+            [],
+        )
+        .expect("mark entry as translate");
+
+        let all = HistoryManager::query_entries_with_conn(&conn, None, Some(10), None, None)
+            .expect("query all");
+        assert_eq!(all.entries.len(), 2);
+        assert!(!all.has_more);
+
+        let translate = HistoryManager::query_entries_with_conn(
+            &conn,
+            None,
+            Some(10),
+            Some(SessionMode::Translate),
+            None,
+        )
+        .expect("query translate");
+        assert_eq!(translate.entries.len(), 1);
+        assert_eq!(translate.entries[0].timestamp, 200);
+
+        // Matches the post-processed text as well as the raw transcription.
+        let search = HistoryManager::query_entries_with_conn(
+            &conn,
+            None,
+            Some(10),
+            None,
+            Some("hello".to_string()),
+        )
+        .expect("query search");
+        assert_eq!(search.entries.len(), 2);
+
+        let none = HistoryManager::query_entries_with_conn(
+            &conn,
+            None,
+            Some(10),
+            None,
+            Some("%".to_string()),
+        )
+        .expect("query wildcard search");
+        assert!(
+            none.entries.is_empty(),
+            "LIKE wildcards in the query are escaped"
+        );
+    }
+
+    #[test]
+    fn query_entries_paginates_by_cursor() {
+        let conn = setup_conn();
+        for timestamp in [100, 200, 300] {
+            insert_entry(&conn, timestamp, "text", None);
+        }
+
+        let first = HistoryManager::query_entries_with_conn(&conn, None, Some(2), None, None)
+            .expect("first page");
+        assert_eq!(first.entries.len(), 2);
+        assert!(first.has_more);
+
+        let cursor = first.entries.last().expect("last entry").id;
+        let second =
+            HistoryManager::query_entries_with_conn(&conn, Some(cursor), Some(2), None, None)
+                .expect("second page");
+        assert_eq!(second.entries.len(), 1);
+        assert!(!second.has_more);
+    }
+
+    #[test]
+    fn record_usage_accumulates_per_day_and_mode() {
+        let conn = setup_conn();
+        // 2024-01-02 12:00 UTC — far enough from midnight that any local
+        // timezone keeps both entries on the same calendar day.
+        let noon = 1_704_196_800;
+
+        HistoryManager::record_usage_with_conn(
+            &conn,
+            &entry_for_usage(noon, "12345", None, SessionMode::Dictate, 2_000),
+        )
+        .expect("record dictate usage");
+        HistoryManager::record_usage_with_conn(
+            &conn,
+            // The pasted (post-processed) text is what the user got.
+            &entry_for_usage(noon, "raw", Some("1234567890"), SessionMode::Dictate, 3_000),
+        )
+        .expect("record second dictate usage");
+        HistoryManager::record_usage_with_conn(
+            &conn,
+            &entry_for_usage(noon, "hi", None, SessionMode::Translate, 1_000),
+        )
+        .expect("record translate usage");
+
+        let days = HistoryManager::get_usage_days_with_conn(&conn, None).expect("usage days");
+        assert_eq!(days.len(), 2, "one row per day and mode");
+
+        let dictate = days
+            .iter()
+            .find(|d| d.mode == SessionMode::Dictate)
+            .expect("dictate row");
+        assert_eq!(dictate.sessions, 2);
+        assert_eq!(dictate.chars, 15);
+        assert_eq!(dictate.audio_ms, 5_000);
+
+        let only_translate =
+            HistoryManager::get_usage_days_with_conn(&conn, Some(SessionMode::Translate))
+                .expect("translate usage days");
+        assert_eq!(only_translate.len(), 1);
+        assert_eq!(only_translate[0].sessions, 1);
+        assert_eq!(only_translate[0].chars, 2);
+    }
+
+    #[test]
+    fn record_usage_ignores_failed_transcriptions() {
+        let conn = setup_conn();
+        HistoryManager::record_usage_with_conn(
+            &conn,
+            &entry_for_usage(1_704_196_800, "   ", None, SessionMode::Dictate, 4_000),
+        )
+        .expect("record empty usage");
+
+        let days = HistoryManager::get_usage_days_with_conn(&conn, None).expect("usage days");
+        assert!(days.is_empty());
     }
 }

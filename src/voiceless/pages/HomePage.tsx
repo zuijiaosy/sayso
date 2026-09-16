@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Keyboard } from "lucide-react";
 import { commands, type FnKeyUsage, type ShortcutActivation } from "@/bindings";
 import { Button } from "@/components/ui/Button";
 import { useSettings } from "@/hooks/useSettings";
@@ -53,7 +52,7 @@ export const FnSettingNotice: React.FC<{ usage: FnKeyUsage | null }> = ({
   );
 };
 
-export const ShortcutsPage: React.FC = () => {
+export const HomePage: React.FC = () => {
   const { t } = useTranslation();
   const { settings, updateSetting } = useSettings();
   const { usage } = useFnKeyUsage();
@@ -63,23 +62,20 @@ export const ShortcutsPage: React.FC = () => {
     usesFn(settings?.bindings?.translate?.current_binding);
 
   return (
-    <Page title={t("voiceless.nav.shortcuts")}>
+    <Page title={t("voiceless.nav.home")}>
       {anyFn && <FnSettingNotice usage={usage} />}
-      <Section
-        icon={<Keyboard size={20} />}
-        title={t("voiceless.shortcuts.title")}
-      >
+      <Section>
         <Row
           title={t("voiceless.shortcuts.dictate.title")}
           description={t("voiceless.shortcuts.dictate.description")}
         >
-          <ShortcutField bindingId="transcribe" altBindingId="transcribe_alt" />
+          <ShortcutField bindingId="transcribe" />
         </Row>
         <Row
           title={t("voiceless.shortcuts.translate.title")}
           description={t("voiceless.shortcuts.translate.description")}
         >
-          <ShortcutField bindingId="translate" altBindingId="translate_alt" />
+          <ShortcutField bindingId="translate" />
         </Row>
         <Row
           title={t("voiceless.shortcuts.activation.title")}

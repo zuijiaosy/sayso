@@ -1,3 +1,4 @@
+use crate::audio_toolkit::constants::WHISPER_SAMPLE_RATE;
 use anyhow::Result;
 use hound::{WavReader, WavSpec, WavWriter};
 use log::debug;
@@ -31,7 +32,7 @@ pub fn verify_wav_file<P: AsRef<Path>>(file_path: P, expected_samples: usize) ->
 pub fn save_wav_file<P: AsRef<Path>>(file_path: P, samples: &[f32]) -> Result<()> {
     let spec = WavSpec {
         channels: 1,
-        sample_rate: 16000,
+        sample_rate: WHISPER_SAMPLE_RATE,
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
