@@ -1,4 +1,5 @@
 use crate::settings::PostProcessProvider;
+use crate::trace::TokenUsage;
 use log::{debug, error, info};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE, USER_AGENT};
 use serde::{Deserialize, Serialize};
@@ -135,6 +136,41 @@ struct ChatCompletionRequest {
 #[derive(Debug, Deserialize)]
 struct ChatCompletionResponse {
     choices: Vec<ChatChoice>,
+    #[serde(default)]
+    usage: Option<ApiUsage>,
+}
+
+/// OpenAI-shaped `usage` block. Anthropic is reached through its
+/// OpenAI-compatible endpoint, so it reports the same field names.
+#[derive(Debug, Default, Deserialize)]
+struct ApiUsage {
+    #[serde(default)]
+    prompt_tokens: Option<i64>,
+    #[serde(default)]
+    completion_tokens: Option<i64>,
+}
+
+/// A chat completion reply: the text plus what the endpoint says it billed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatCompletion {
+    pub content: Option<String>,
+    pub usage: Option<TokenUsage>,
+}
+
+impl ChatCompletionResponse {
+    fn into_completion(self) -> ChatCompletion {
+        let usage = self
+            .usage
+            .and_then(|u| TokenUsage::from_parts(u.prompt_tokens, u.completion_tokens));
+        ChatCompletion {
+            content: self
+                .choices
+                .into_iter()
+                .next()
+                .and_then(|choice| choice.message.content),
+            usage,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -302,8 +338,8 @@ fn report_reqwest_error(context: &str, error: &reqwest::Error) -> String {
 }
 
 /// Send a chat completion request to an OpenAI-compatible API
-/// Returns Ok(Some(content)) on success, Ok(None) if response has no content,
-/// or Err on actual errors (HTTP, parsing, etc.)
+/// Returns the reply (whose `content` is `None` when the response carried no
+/// text), or Err on actual errors (HTTP, parsing, etc.)
 #[allow(dead_code)] // upstream API; Sayso always sends a system prompt
 pub async fn send_chat_completion(
     provider: &PostProcessProvider,
@@ -311,7 +347,7 @@ pub async fn send_chat_completion(
     model: &str,
     prompt: String,
     disable_reasoning: bool,
-) -> Result<Option<String>, String> {
+) -> Result<ChatCompletion, String> {
     send_chat_completion_with_schema(
         provider,
         api_key,
@@ -342,7 +378,7 @@ pub async fn send_chat_completion_with_schema(
     system_prompt: Option<String>,
     json_schema: Option<Value>,
     disable_reasoning: bool,
-) -> Result<Option<String>, String> {
+) -> Result<ChatCompletion, String> {
     let base_url = provider.base_url.trim_end_matches('/');
     let url = format!("{}/chat/completions", base_url);
 
@@ -463,10 +499,7 @@ pub async fn send_chat_completion_with_schema(
         .await
         .map_err(|e| report_reqwest_error("Failed to parse API response", &e))?;
 
-    Ok(completion
-        .choices
-        .first()
-        .and_then(|choice| choice.message.content.clone()))
+    Ok(completion.into_completion())
 }
 
 /// Fetch available models from an OpenAI-compatible API
@@ -702,6 +735,38 @@ mod tests {
         assert_eq!(json["reasoning"]["effort"], "none");
         assert_eq!(json["reasoning"]["exclude"], true);
         assert!(json.get("thinking").is_none());
+    }
+
+    #[test]
+    fn response_usage_is_read_when_present() {
+        let body = r#"{"choices":[{"message":{"role":"assistant","content":"hi"}}],"usage":{"prompt_tokens":12,"completion_tokens":3,"total_tokens":15}}"#;
+        let parsed: ChatCompletionResponse = serde_json::from_str(body).unwrap();
+        assert_eq!(
+            parsed.into_completion(),
+            ChatCompletion {
+                content: Some("hi".into()),
+                usage: Some(TokenUsage {
+                    input: 12,
+                    output: 3
+                }),
+            }
+        );
+    }
+
+    #[test]
+    fn response_without_usage_still_parses() {
+        let body = r#"{"choices":[{"message":{"content":null}}]}"#;
+        let parsed: ChatCompletionResponse = serde_json::from_str(body).unwrap();
+        assert_eq!(
+            parsed.into_completion(),
+            ChatCompletion {
+                content: None,
+                usage: None
+            }
+        );
+        let body = r#"{"choices":[],"usage":{}}"#;
+        let parsed: ChatCompletionResponse = serde_json::from_str(body).unwrap();
+        assert_eq!(parsed.into_completion().usage, None);
     }
 
     #[test]

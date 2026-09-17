@@ -348,6 +348,11 @@
     hash = "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==";
     name = "trace-mapping-0.3.31.tgz";
   };
+  "@lobehub/icons-static-svg@1.95.0" = fetchurl {
+    url = "https://registry.npmmirror.com/@lobehub/icons-static-svg/-/icons-static-svg-1.95.0.tgz";
+    hash = "sha512-VSObF66DUVQe0EK3xbIoFcw+Fcia1+bLVFkMsQbmz0zCceMxPmoLImS5VM5SM7zL+/NarZ11/ySNfkekcomIkQ==";
+    name = "icons-static-svg-1.95.0.tgz";
+  };
   "@napi-rs/wasm-runtime@1.0.7" = fetchurl {
     url = "https://registry.npmmirror.com/@napi-rs/wasm-runtime/-/wasm-runtime-1.0.7.tgz";
     hash = "sha512-SeDnOO0Tk7Okiq6DbXmmBODgOAb9dp9gjlphokTUxmt8U3liIP1ZsozBahH69j/RJv+Rfs6IwUKHTgQYJ/HBAw==";

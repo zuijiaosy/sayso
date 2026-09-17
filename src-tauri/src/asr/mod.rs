@@ -7,9 +7,69 @@ pub mod dashscope;
 pub mod glm;
 pub mod stepfun;
 
+use crate::trace::TokenUsage;
 use std::io::Cursor;
 
 pub const SAMPLE_RATE: u32 = 16_000;
+
+/// Text recognized from one request (or a whole chunked recording), with the
+/// tokens the vendor reported for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Recognized {
+    pub text: String,
+    pub usage: Option<TokenUsage>,
+}
+
+impl Recognized {
+    /// Join chunk results in order and sum whatever usage they reported.
+    pub fn join(parts: Vec<Recognized>) -> Recognized {
+        let usage = TokenUsage::sum(parts.iter().map(|p| p.usage));
+        let texts: Vec<String> = parts.into_iter().map(|p| p.text).collect();
+        Recognized {
+            text: join_segments(&texts),
+            usage,
+        }
+    }
+}
+
+/// A finished cloud recognition: the text plus which vendor and model ran it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CloudTranscription {
+    pub text: String,
+    pub provider: &'static str,
+    pub model: String,
+    pub usage: Option<TokenUsage>,
+}
+
+/// Token counts from a response body's `usage` block, if it has one.
+/// Accepts both `input_tokens`/`output_tokens` (DashScope and most newer
+/// APIs) and OpenAI's `prompt_tokens`/`completion_tokens`.
+pub fn usage_from_value(value: &serde_json::Value) -> Option<TokenUsage> {
+    let usage = value.get("usage")?;
+    let read = |keys: [&str; 2]| {
+        keys.iter()
+            .find_map(|k| usage.get(*k).and_then(serde_json::Value::as_i64))
+    };
+    TokenUsage::from_parts(
+        read(["input_tokens", "prompt_tokens"]),
+        read(["output_tokens", "completion_tokens"]),
+    )
+}
+
+/// The cloud vendor id and model name the current settings will use.
+pub fn cloud_provider_and_model(settings: &crate::settings::AppSettings) -> (&'static str, String) {
+    match settings.cloud_asr_provider {
+        crate::settings::CloudAsrProvider::Dashscope => {
+            (dashscope::PROVIDER_ID, settings.dashscope_asr.model.clone())
+        }
+        crate::settings::CloudAsrProvider::Glm => {
+            (glm::PROVIDER_ID, settings.glm_asr.model.clone())
+        }
+        crate::settings::CloudAsrProvider::Stepfun => {
+            (stepfun::PROVIDER_ID, settings.stepfun_asr.model.clone())
+        }
+    }
+}
 
 /// Why a cloud recognition request did not produce text.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,8 +179,9 @@ pub fn stepfun_request(settings: &crate::settings::AppSettings) -> stepfun::Step
 pub async fn transcribe_cloud(
     settings: &crate::settings::AppSettings,
     samples: &[f32],
-) -> Result<String, AsrError> {
-    match settings.cloud_asr_provider {
+) -> Result<CloudTranscription, AsrError> {
+    let (provider, model) = cloud_provider_and_model(settings);
+    let recognized = match settings.cloud_asr_provider {
         crate::settings::CloudAsrProvider::Dashscope => {
             dashscope::transcribe(&dashscope_request(settings), samples).await
         }
@@ -130,7 +191,13 @@ pub async fn transcribe_cloud(
         crate::settings::CloudAsrProvider::Stepfun => {
             stepfun::transcribe(&stepfun_request(settings), samples).await
         }
-    }
+    }?;
+    Ok(CloudTranscription {
+        text: recognized.text,
+        provider,
+        model,
+        usage: recognized.usage,
+    })
 }
 
 /// `{base}/audio/transcriptions`, added only when it is not already there.
@@ -146,7 +213,7 @@ pub fn transcriptions_url(endpoint: &str) -> String {
 
 /// Read `{"text": ...}` from an OpenAI-shaped transcription response, or turn
 /// the body into an `AsrError`.
-pub fn parse_transcription_response(status: u16, body: &str) -> Result<String, AsrError> {
+pub fn parse_transcription_response(status: u16, body: &str) -> Result<Recognized, AsrError> {
     let value: serde_json::Value = match serde_json::from_str(body) {
         Ok(v) => v,
         Err(_) if (200..300).contains(&status) => {
@@ -178,11 +245,15 @@ pub fn parse_transcription_response(status: u16, body: &str) -> Result<String, A
             message,
         });
     }
-    value
+    let text = value
         .get("text")
         .and_then(serde_json::Value::as_str)
         .map(|t| t.trim().to_string())
-        .ok_or_else(|| AsrError::InvalidResponse("missing text".into()))
+        .ok_or_else(|| AsrError::InvalidResponse("missing text".into()))?;
+    Ok(Recognized {
+        text,
+        usage: usage_from_value(&value),
+    })
 }
 
 /// Trimmed, de-duplicated terms, at most `cap` of them. Shared by the vendors
@@ -321,6 +392,89 @@ mod tests {
             "cut at {first} should fall inside the silent gap"
         );
         assert_eq!(chunks.iter().map(|c| c.len()).sum::<usize>(), samples.len());
+    }
+
+    #[test]
+    fn usage_is_read_from_either_naming() {
+        let dashscope = serde_json::json!({
+            "usage": {"input_tokens_details": {"text_tokens": 5}, "output_tokens": 9, "input_tokens": 40, "seconds": 2}
+        });
+        assert_eq!(
+            usage_from_value(&dashscope),
+            Some(TokenUsage {
+                input: 40,
+                output: 9
+            })
+        );
+        let openai = serde_json::json!({"usage": {"prompt_tokens": 7, "completion_tokens": 2}});
+        assert_eq!(
+            usage_from_value(&openai),
+            Some(TokenUsage {
+                input: 7,
+                output: 2
+            })
+        );
+        assert_eq!(usage_from_value(&serde_json::json!({"text": "hi"})), None);
+        assert_eq!(
+            usage_from_value(&serde_json::json!({"usage": {"seconds": 3}})),
+            None
+        );
+    }
+
+    #[test]
+    fn openai_shaped_response_carries_optional_usage() {
+        let plain = parse_transcription_response(200, r#"{"text":" hi "}"#).unwrap();
+        assert_eq!(
+            plain,
+            Recognized {
+                text: "hi".into(),
+                usage: None
+            }
+        );
+        let with_usage = parse_transcription_response(
+            200,
+            r#"{"text":"hi","usage":{"input_tokens":30,"output_tokens":4}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            with_usage.usage,
+            Some(TokenUsage {
+                input: 30,
+                output: 4
+            })
+        );
+    }
+
+    #[test]
+    fn joined_chunks_sum_usage() {
+        let joined = Recognized::join(vec![
+            Recognized {
+                text: "你好".into(),
+                usage: Some(TokenUsage {
+                    input: 10,
+                    output: 2,
+                }),
+            },
+            Recognized {
+                text: "世界".into(),
+                usage: None,
+            },
+            Recognized {
+                text: "。".into(),
+                usage: Some(TokenUsage {
+                    input: 1,
+                    output: 1,
+                }),
+            },
+        ]);
+        assert_eq!(joined.text, "你好世界。");
+        assert_eq!(
+            joined.usage,
+            Some(TokenUsage {
+                input: 11,
+                output: 3
+            })
+        );
     }
 
     #[test]

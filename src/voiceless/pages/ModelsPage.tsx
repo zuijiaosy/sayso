@@ -28,6 +28,7 @@ import {
   TabbedSection,
   TextInput,
 } from "../ui";
+import { ProviderIcon } from "../ProviderIcon";
 
 export const SENSE_VOICE_ID = "sense-voice-int8";
 
@@ -493,7 +494,14 @@ const CloudAsrBody: React.FC = () => {
 
   return (
     <>
-      <Row title={t("voiceless.models.cloud.vendor")}>
+      <Row
+        title={
+          <span className="inline-flex items-center gap-2">
+            <ProviderIcon id={vendor} size={16} className="text-muted" />
+            {t("voiceless.models.cloud.vendor")}
+          </span>
+        }
+      >
         <SelectInput
           value={vendor}
           onChange={async (e) => {
@@ -595,7 +603,14 @@ const TextModelBody: React.FC = () => {
           </Notice>
         </div>
       )}
-      <Row title={t("voiceless.models.text.provider")}>
+      <Row
+        title={
+          <span className="inline-flex items-center gap-2">
+            <ProviderIcon id={providerId} size={16} className="text-muted" />
+            {t("voiceless.models.text.provider")}
+          </span>
+        }
+      >
         <SelectInput
           value={providerId}
           onChange={(e) => void setPostProcessProvider(e.target.value)}

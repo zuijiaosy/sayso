@@ -1,3 +1,4 @@
+use crate::trace::{AsrTrace, LlmTrace, TokenUsage};
 use crate::voice::SessionMode;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local, Utc};
@@ -44,12 +45,27 @@ static MIGRATIONS: &[M] = &[
             PRIMARY KEY (day, mode)
         );",
     ),
+    // Which recognizer / text model produced each entry, and what they billed.
+    M::up(
+        "ALTER TABLE transcription_history ADD COLUMN asr_provider TEXT;
+        ALTER TABLE transcription_history ADD COLUMN asr_model TEXT;
+        ALTER TABLE transcription_history ADD COLUMN asr_input_tokens INTEGER;
+        ALTER TABLE transcription_history ADD COLUMN asr_output_tokens INTEGER;
+        ALTER TABLE transcription_history ADD COLUMN asr_ms INTEGER;
+        ALTER TABLE transcription_history ADD COLUMN llm_provider TEXT;
+        ALTER TABLE transcription_history ADD COLUMN llm_model TEXT;
+        ALTER TABLE transcription_history ADD COLUMN llm_input_tokens INTEGER;
+        ALTER TABLE transcription_history ADD COLUMN llm_output_tokens INTEGER;
+        ALTER TABLE transcription_history ADD COLUMN llm_ms INTEGER;",
+    ),
 ];
 
 /// Every column of `transcription_history`, in the order `map_history_entry`
 /// reads them. Kept in one place so a new column only has to be added once.
 const ENTRY_COLUMNS: &str = "id, file_name, timestamp, saved, title, transcription_text, \
-     post_processed_text, post_process_prompt, post_process_requested, mode, audio_ms";
+     post_processed_text, post_process_prompt, post_process_requested, mode, audio_ms, \
+     asr_provider, asr_model, asr_input_tokens, asr_output_tokens, asr_ms, \
+     llm_provider, llm_model, llm_input_tokens, llm_output_tokens, llm_ms";
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct PaginatedHistory {
@@ -85,6 +101,88 @@ pub struct HistoryEntry {
     pub post_process_requested: bool,
     pub mode: SessionMode,
     pub audio_ms: i64,
+    /// Recognizer that produced `transcription_text`. `None` for entries
+    /// saved before this was recorded.
+    pub asr: Option<AsrTrace>,
+    /// Text model that produced `post_processed_text`, when one did.
+    pub llm: Option<LlmTrace>,
+}
+
+/// Everything needed to insert a history entry; the id, timestamp and title
+/// are assigned on save.
+#[derive(Clone, Debug)]
+pub struct NewHistoryEntry {
+    pub file_name: String,
+    pub transcription_text: String,
+    pub post_process_requested: bool,
+    pub post_processed_text: Option<String>,
+    pub post_process_prompt: Option<String>,
+    pub mode: SessionMode,
+    pub audio_ms: i64,
+    pub asr: Option<AsrTrace>,
+    pub llm: Option<LlmTrace>,
+}
+
+/// One route's columns (`asr_*` or `llm_*`), flattened for SQL parameters.
+struct TraceColumns<'a> {
+    provider: Option<&'a str>,
+    model: Option<&'a str>,
+    input_tokens: Option<i64>,
+    output_tokens: Option<i64>,
+    ms: Option<i64>,
+}
+
+impl<'a> TraceColumns<'a> {
+    fn new(
+        provider: Option<&'a str>,
+        model: Option<&'a str>,
+        usage: Option<TokenUsage>,
+        ms: Option<i64>,
+    ) -> Self {
+        Self {
+            provider,
+            model,
+            input_tokens: usage.map(|u| u.input),
+            output_tokens: usage.map(|u| u.output),
+            ms,
+        }
+    }
+
+    fn asr(trace: Option<&'a AsrTrace>) -> Self {
+        match trace {
+            Some(t) => Self::new(Some(&t.provider), t.model.as_deref(), t.usage, t.ms),
+            None => Self::new(None, None, None, None),
+        }
+    }
+
+    fn llm(trace: Option<&'a LlmTrace>) -> Self {
+        match trace {
+            Some(t) => Self::new(Some(&t.provider), t.model.as_deref(), t.usage, t.ms),
+            None => Self::new(None, None, None, None),
+        }
+    }
+}
+
+/// Read one route's columns; `None` when the provider column is empty.
+#[allow(clippy::type_complexity)]
+fn read_trace_columns(
+    row: &rusqlite::Row<'_>,
+    prefix: &str,
+) -> rusqlite::Result<Option<(String, Option<String>, Option<TokenUsage>, Option<i64>)>> {
+    let provider: Option<String> = row.get(format!("{prefix}_provider").as_str())?;
+    let Some(provider) = provider.filter(|p| !p.is_empty()) else {
+        return Ok(None);
+    };
+    let model: Option<String> = row.get(format!("{prefix}_model").as_str())?;
+    let input: Option<i64> = row.get(format!("{prefix}_input_tokens").as_str())?;
+    let output: Option<i64> = row.get(format!("{prefix}_output_tokens").as_str())?;
+    let ms: Option<i64> = row.get(format!("{prefix}_ms").as_str())?;
+    Ok(Some((
+        provider,
+        model,
+        TokenUsage::from_parts(input, output),
+        ms,
+    )))
 }
 
 /// One day's totals for a single mode, as stored in `usage_daily`. Weekly and
@@ -266,6 +364,18 @@ impl HistoryManager {
             post_process_requested: row.get("post_process_requested")?,
             mode: mode_from_str(&row.get::<_, String>("mode")?),
             audio_ms: row.get("audio_ms")?,
+            asr: read_trace_columns(row, "asr")?.map(|(provider, model, usage, ms)| AsrTrace {
+                provider,
+                model,
+                usage,
+                ms,
+            }),
+            llm: read_trace_columns(row, "llm")?.map(|(provider, model, usage, ms)| LlmTrace {
+                provider,
+                model,
+                usage,
+                ms,
+            }),
         })
     }
 
@@ -350,61 +460,12 @@ impl HistoryManager {
 
     /// Save a new history entry to the database.
     /// The WAV file should already have been written to the recordings directory.
-    #[allow(clippy::too_many_arguments)]
-    pub fn save_entry(
-        &self,
-        file_name: String,
-        transcription_text: String,
-        post_process_requested: bool,
-        post_processed_text: Option<String>,
-        post_process_prompt: Option<String>,
-        mode: SessionMode,
-        audio_ms: i64,
-    ) -> Result<HistoryEntry> {
+    pub fn save_entry(&self, new: NewHistoryEntry) -> Result<HistoryEntry> {
         let timestamp = Utc::now().timestamp();
         let title = self.format_timestamp_title(timestamp);
 
         let conn = self.get_connection()?;
-        conn.execute(
-            "INSERT INTO transcription_history (
-                file_name,
-                timestamp,
-                saved,
-                title,
-                transcription_text,
-                post_processed_text,
-                post_process_prompt,
-                post_process_requested,
-                mode,
-                audio_ms
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-            params![
-                &file_name,
-                timestamp,
-                false,
-                &title,
-                &transcription_text,
-                &post_processed_text,
-                &post_process_prompt,
-                post_process_requested,
-                mode_to_str(mode),
-                audio_ms,
-            ],
-        )?;
-
-        let entry = HistoryEntry {
-            id: conn.last_insert_rowid(),
-            file_name,
-            timestamp,
-            saved: false,
-            title,
-            transcription_text,
-            post_processed_text,
-            post_process_prompt,
-            post_process_requested,
-            mode,
-            audio_ms,
-        };
+        let entry = Self::insert_entry_with_conn(&conn, new, timestamp, title)?;
 
         Self::record_usage_with_conn(&conn, &entry)?;
 
@@ -424,37 +485,100 @@ impl HistoryManager {
         Ok(entry)
     }
 
-    /// Update an existing history entry with new transcription results (used by retry).
+    fn insert_entry_with_conn(
+        conn: &Connection,
+        new: NewHistoryEntry,
+        timestamp: i64,
+        title: String,
+    ) -> Result<HistoryEntry> {
+        let asr = TraceColumns::asr(new.asr.as_ref());
+        let llm = TraceColumns::llm(new.llm.as_ref());
+        conn.execute(
+            "INSERT INTO transcription_history (
+                file_name,
+                timestamp,
+                saved,
+                title,
+                transcription_text,
+                post_processed_text,
+                post_process_prompt,
+                post_process_requested,
+                mode,
+                audio_ms,
+                asr_provider,
+                asr_model,
+                asr_input_tokens,
+                asr_output_tokens,
+                asr_ms,
+                llm_provider,
+                llm_model,
+                llm_input_tokens,
+                llm_output_tokens,
+                llm_ms
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+                      ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+            params![
+                &new.file_name,
+                timestamp,
+                false,
+                &title,
+                &new.transcription_text,
+                &new.post_processed_text,
+                &new.post_process_prompt,
+                new.post_process_requested,
+                mode_to_str(new.mode),
+                new.audio_ms,
+                asr.provider,
+                asr.model,
+                asr.input_tokens,
+                asr.output_tokens,
+                asr.ms,
+                llm.provider,
+                llm.model,
+                llm.input_tokens,
+                llm.output_tokens,
+                llm.ms,
+            ],
+        )?;
+
+        Ok(HistoryEntry {
+            id: conn.last_insert_rowid(),
+            file_name: new.file_name,
+            timestamp,
+            saved: false,
+            title,
+            transcription_text: new.transcription_text,
+            post_processed_text: new.post_processed_text,
+            post_process_prompt: new.post_process_prompt,
+            post_process_requested: new.post_process_requested,
+            mode: new.mode,
+            audio_ms: new.audio_ms,
+            asr: new.asr,
+            llm: new.llm,
+        })
+    }
+
+    /// Update an existing history entry with new transcription results (used by
+    /// retry). The route columns are overwritten too, so a retry that skips the
+    /// text model clears the old one.
     pub fn update_transcription(
         &self,
         id: i64,
         transcription_text: String,
         post_processed_text: Option<String>,
         post_process_prompt: Option<String>,
+        asr: Option<AsrTrace>,
+        llm: Option<LlmTrace>,
     ) -> Result<HistoryEntry> {
         let conn = self.get_connection()?;
-        let updated = conn.execute(
-            "UPDATE transcription_history
-             SET transcription_text = ?1,
-                 post_processed_text = ?2,
-                 post_process_prompt = ?3
-             WHERE id = ?4",
-            params![
-                transcription_text,
-                post_processed_text,
-                post_process_prompt,
-                id
-            ],
-        )?;
-
-        if updated == 0 {
-            return Err(anyhow!("History entry {} not found", id));
-        }
-
-        let entry = conn.query_row(
-            &format!("SELECT {ENTRY_COLUMNS} FROM transcription_history WHERE id = ?1"),
-            params![id],
-            Self::map_history_entry,
+        let entry = Self::update_transcription_with_conn(
+            &conn,
+            id,
+            transcription_text,
+            post_processed_text,
+            post_process_prompt,
+            asr.as_ref(),
+            llm.as_ref(),
         )?;
 
         debug!("Updated transcription for history entry {}", id);
@@ -468,6 +592,62 @@ impl HistoryManager {
         }
 
         Ok(entry)
+    }
+
+    fn update_transcription_with_conn(
+        conn: &Connection,
+        id: i64,
+        transcription_text: String,
+        post_processed_text: Option<String>,
+        post_process_prompt: Option<String>,
+        asr: Option<&AsrTrace>,
+        llm: Option<&LlmTrace>,
+    ) -> Result<HistoryEntry> {
+        let asr = TraceColumns::asr(asr);
+        let llm = TraceColumns::llm(llm);
+        let updated = conn.execute(
+            "UPDATE transcription_history
+             SET transcription_text = ?1,
+                 post_processed_text = ?2,
+                 post_process_prompt = ?3,
+                 asr_provider = ?4,
+                 asr_model = ?5,
+                 asr_input_tokens = ?6,
+                 asr_output_tokens = ?7,
+                 asr_ms = ?8,
+                 llm_provider = ?9,
+                 llm_model = ?10,
+                 llm_input_tokens = ?11,
+                 llm_output_tokens = ?12,
+                 llm_ms = ?13
+             WHERE id = ?14",
+            params![
+                transcription_text,
+                post_processed_text,
+                post_process_prompt,
+                asr.provider,
+                asr.model,
+                asr.input_tokens,
+                asr.output_tokens,
+                asr.ms,
+                llm.provider,
+                llm.model,
+                llm.input_tokens,
+                llm.output_tokens,
+                llm.ms,
+                id
+            ],
+        )?;
+
+        if updated == 0 {
+            return Err(anyhow!("History entry {} not found", id));
+        }
+
+        Ok(conn.query_row(
+            &format!("SELECT {ENTRY_COLUMNS} FROM transcription_history WHERE id = ?1"),
+            params![id],
+            Self::map_history_entry,
+        )?)
     }
 
     /// Prune old *recordings*. Transcribed text is kept forever — the History
@@ -790,31 +970,12 @@ mod tests {
     use rusqlite::{params, Connection};
 
     fn setup_conn() -> Connection {
-        let conn = Connection::open_in_memory().expect("open in-memory db");
-        conn.execute_batch(
-            "CREATE TABLE transcription_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                file_name TEXT NOT NULL,
-                timestamp INTEGER NOT NULL,
-                saved BOOLEAN NOT NULL DEFAULT 0,
-                title TEXT NOT NULL,
-                transcription_text TEXT NOT NULL,
-                post_processed_text TEXT,
-                post_process_prompt TEXT,
-                post_process_requested BOOLEAN NOT NULL DEFAULT 0,
-                mode TEXT NOT NULL DEFAULT 'dictate',
-                audio_ms INTEGER NOT NULL DEFAULT 0
-            );
-            CREATE TABLE usage_daily (
-                day TEXT NOT NULL,
-                mode TEXT NOT NULL,
-                sessions INTEGER NOT NULL DEFAULT 0,
-                chars INTEGER NOT NULL DEFAULT 0,
-                audio_ms INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY (day, mode)
-            );",
-        )
-        .expect("create history tables");
+        // Build the schema from the real migrations so the tests catch any
+        // drift between them, `ENTRY_COLUMNS` and the INSERT/UPDATE lists.
+        let mut conn = Connection::open_in_memory().expect("open in-memory db");
+        Migrations::new(MIGRATIONS.to_vec())
+            .to_latest(&mut conn)
+            .expect("apply migrations");
         conn
     }
 
@@ -867,7 +1028,122 @@ mod tests {
             post_process_requested: false,
             mode,
             audio_ms,
+            asr: None,
+            llm: None,
         }
+    }
+
+    fn new_entry(text: &str) -> NewHistoryEntry {
+        NewHistoryEntry {
+            file_name: "sayso-1.wav".into(),
+            transcription_text: text.into(),
+            post_process_requested: true,
+            post_processed_text: Some(format!("{text}!")),
+            post_process_prompt: Some("prompt".into()),
+            mode: SessionMode::Dictate,
+            audio_ms: 1200,
+            asr: Some(AsrTrace {
+                provider: "dashscope".into(),
+                model: Some("qwen3-asr-flash".into()),
+                usage: Some(TokenUsage {
+                    input: 52,
+                    output: 3,
+                }),
+                ms: Some(640),
+            }),
+            llm: Some(LlmTrace {
+                provider: "deepseek".into(),
+                model: Some("deepseek-chat".into()),
+                usage: Some(TokenUsage {
+                    input: 300,
+                    output: 12,
+                }),
+                ms: Some(900),
+            }),
+        }
+    }
+
+    #[test]
+    fn route_trace_round_trips_through_the_table() {
+        let conn = setup_conn();
+        let new = new_entry("hello");
+        let saved =
+            HistoryManager::insert_entry_with_conn(&conn, new.clone(), 100, "t".into()).unwrap();
+        let read = HistoryManager::get_latest_entry_with_conn(&conn)
+            .unwrap()
+            .expect("entry exists");
+        assert_eq!(read.asr, new.asr);
+        assert_eq!(read.llm, new.llm);
+        assert_eq!(read.asr, saved.asr);
+        assert_eq!(read.post_processed_text.as_deref(), Some("hello!"));
+    }
+
+    #[test]
+    fn legacy_rows_have_no_route() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "old", None);
+        let read = HistoryManager::get_latest_entry_with_conn(&conn)
+            .unwrap()
+            .expect("entry exists");
+        assert_eq!(read.asr, None);
+        assert_eq!(read.llm, None);
+    }
+
+    #[test]
+    fn route_without_usage_keeps_usage_empty() {
+        let conn = setup_conn();
+        let mut new = new_entry("x");
+        new.asr = Some(AsrTrace {
+            provider: "local".into(),
+            model: None,
+            usage: None,
+            ms: None,
+        });
+        new.llm = None;
+        HistoryManager::insert_entry_with_conn(&conn, new, 100, "t".into()).unwrap();
+        let read = HistoryManager::get_latest_entry_with_conn(&conn)
+            .unwrap()
+            .unwrap();
+        let asr = read.asr.expect("asr trace");
+        assert_eq!(asr.provider, "local");
+        assert_eq!(asr.usage, None);
+        assert_eq!(read.llm, None);
+    }
+
+    #[test]
+    fn retry_overwrites_the_route() {
+        let conn = setup_conn();
+        let saved =
+            HistoryManager::insert_entry_with_conn(&conn, new_entry("a"), 100, "t".into()).unwrap();
+        let local = AsrTrace {
+            provider: "local".into(),
+            model: Some("sense-voice".into()),
+            usage: None,
+            ms: Some(80),
+        };
+        let updated = HistoryManager::update_transcription_with_conn(
+            &conn,
+            saved.id,
+            "b".into(),
+            None,
+            None,
+            Some(&local),
+            None,
+        )
+        .unwrap();
+        assert_eq!(updated.transcription_text, "b");
+        assert_eq!(updated.asr, Some(local));
+        assert_eq!(updated.llm, None, "the old text model is cleared");
+        assert!(HistoryManager::update_transcription_with_conn(
+            &conn,
+            saved.id + 1,
+            "c".into(),
+            None,
+            None,
+            None,
+            None
+        )
+        .is_err());
     }
 
     #[test]

@@ -1246,6 +1246,22 @@ export type AsrProviderKind =
  * `dashscope` is the value stored by 0.1 builds before GLM was added.
  */
 "cloud"
+/**
+ * The speech recognizer that produced the raw transcript.
+ */
+export type AsrTrace = {
+/**
+ * `"local"` or a cloud vendor id (`dashscope`, `glm`, `stepfun`).
+ */
+provider: string;
+/**
+ * Local model id or cloud model name.
+ */
+model: string | null; usage: TokenUsage | null;
+/**
+ * Wall-clock recognition time.
+ */
+ms: number | null }
 export type AudioDevice = { index: string; name: string; is_default: boolean }
 export type AutoSubmitKey = "enter" | "ctrl_enter" | "cmd_enter"
 export type AvailableAccelerators = { transcribe: string[]; ort: string[]; gpu_devices: GpuDeviceOption[] }
@@ -1371,7 +1387,16 @@ export type HistoryEntry = { id: number;
  * Empty once the recording has been cleaned up. The text is kept forever;
  * only the WAV is pruned, so an entry with no file name cannot be retried.
  */
-file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string; post_processed_text: string | null; post_process_prompt: string | null; post_process_requested: boolean; mode: SessionMode; audio_ms: number }
+file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string; post_processed_text: string | null; post_process_prompt: string | null; post_process_requested: boolean; mode: SessionMode; audio_ms: number;
+/**
+ * Recognizer that produced `transcription_text`. `None` for entries
+ * saved before this was recorded.
+ */
+asr: AsrTrace | null;
+/**
+ * Text model that produced `post_processed_text`, when one did.
+ */
+llm: LlmTrace | null }
 export type HistoryUpdatePayload = { action: "added"; entry: HistoryEntry } | { action: "updated"; entry: HistoryEntry } | { action: "deleted"; id: number } | { action: "toggled"; id: number }
 /**
  * Result of changing keyboard implementation
@@ -1388,6 +1413,15 @@ export type KeyboardDiagnosticReport = { secure_input_enabled: boolean; culprit_
 key_down: number; key_up: number; flags_changed: number; mouse: number; duration_ms: number }
 export type KeyboardImplementation = "tauri" | "handy_keys"
 export type LLMPrompt = { id: string; name: string; prompt: string }
+/**
+ * The text model that polished or translated the transcript. Only present
+ * when its output is what got inserted.
+ */
+export type LlmTrace = {
+/**
+ * A post-processing provider id (`deepseek`, `openai`, `custom`, …).
+ */
+provider: string; model: string | null; usage: TokenUsage | null; ms: number | null }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 export type ModelInfo = { id: string; name: string; description: string; filename: string; source: ModelSource; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean; supports_streaming: boolean; supports_language_detection: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
@@ -1537,6 +1571,10 @@ export type StreamWorkKind = "transcribing" | "polishing"
  * and `Dark` force one of the two palettes Handy already ships.
  */
 export type Theme = "system" | "light" | "dark"
+/**
+ * Tokens a vendor reported for one request (or the sum over its chunks).
+ */
+export type TokenUsage = { input: number; output: number }
 export type TranscribeAcceleratorSetting = "auto" | "cpu" | "gpu"
 /**
  * A target language offered in the overlay picker.

@@ -8,7 +8,7 @@ import React, {
 import { useTranslation } from "react-i18next";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { toast } from "sonner";
-import { Copy, Search, Trash2 } from "lucide-react";
+import { Copy, Info, Search, Trash2 } from "lucide-react";
 import {
   commands,
   events,
@@ -16,7 +16,9 @@ import {
   type SessionMode,
 } from "@/bindings";
 import { Button } from "@/components/ui/Button";
+import { ProviderIcon, useProviderNames } from "../ProviderIcon";
 import { Chip, Page, Segmented, TextInput } from "../ui";
+import { HistoryDetailsModal } from "./HistoryDetailsModal";
 
 const PAGE_SIZE = 50;
 
@@ -33,6 +35,41 @@ const dayKey = (timestamp: number) => {
 
 const startOfDay = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+/**
+ * Which recognizer and text model produced an entry, as one or two small
+ * brand marks. Entries saved before routes were recorded leave it blank.
+ */
+const RouteIcons: React.FC<{ entry: HistoryEntry }> = ({ entry }) => {
+  const { providerName, modelName } = useProviderNames();
+  const describe = (
+    provider: string,
+    model: string | null,
+    kind: "asr" | "llm",
+  ) =>
+    [providerName(provider, kind), modelName(provider, model)]
+      .filter(Boolean)
+      .join(" · ");
+
+  // Fixed width fits two marks, so the text column lines up across rows
+  // with one, two or no icons.
+  return (
+    <span className="shrink-0 w-[34px] flex items-center gap-1.5 pt-[3px] text-muted">
+      {entry.asr && (
+        <ProviderIcon
+          id={entry.asr.provider}
+          title={describe(entry.asr.provider, entry.asr.model, "asr")}
+        />
+      )}
+      {entry.llm && (
+        <ProviderIcon
+          id={entry.llm.provider}
+          title={describe(entry.llm.provider, entry.llm.model, "llm")}
+        />
+      )}
+    </span>
+  );
+};
 
 /** "Today" / "Yesterday" / a localized date, for the list's day separators. */
 const useDayLabel = () => {
@@ -75,12 +112,14 @@ const EntryRow: React.FC<{ entry: HistoryEntry; showMode: boolean }> = ({
     [i18n.language],
   );
   const text = finalText(entry);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   return (
     <div className="group flex items-start gap-3 py-3">
       <span className="shrink-0 w-11 pt-0.5 text-[12px] tabular-nums text-muted">
         {timeFormat.format(new Date(entry.timestamp * 1000))}
       </span>
+      <RouteIcons entry={entry} />
       <div className="flex-1 min-w-0 text-[14px] leading-relaxed break-words">
         {text.trim() ? (
           <span className="select-text">{text}</span>
@@ -96,6 +135,15 @@ const EntryRow: React.FC<{ entry: HistoryEntry; showMode: boolean }> = ({
         )}
       </div>
       <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <Button
+          variant="ghost"
+          size="sm"
+          title={t("voiceless.history.details")}
+          aria-label={t("voiceless.history.details")}
+          onClick={() => setDetailsOpen(true)}
+        >
+          <Info size={14} />
+        </Button>
         {text.trim() && (
           <Button
             variant="ghost"
@@ -123,6 +171,11 @@ const EntryRow: React.FC<{ entry: HistoryEntry; showMode: boolean }> = ({
           <Trash2 size={14} />
         </Button>
       </div>
+      <HistoryDetailsModal
+        entry={entry}
+        open={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+      />
     </div>
   );
 };

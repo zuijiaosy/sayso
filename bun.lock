@@ -5,6 +5,7 @@
     "": {
       "name": "handy-app",
       "dependencies": {
+        "@lobehub/icons-static-svg": "^1.95.0",
         "@tailwindcss/vite": "^4.1.16",
         "@tauri-apps/api": "^2.11.0",
         "@tauri-apps/plugin-autostart": "~2.5.1",
@@ -172,6 +173,8 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "https://registry.npmmirror.com/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.5.5.tgz", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "https://registry.npmmirror.com/@jridgewell/trace-mapping/-/trace-mapping-0.3.31.tgz", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
+
+    "@lobehub/icons-static-svg": ["@lobehub/icons-static-svg@1.95.0", "https://registry.npmmirror.com/@lobehub/icons-static-svg/-/icons-static-svg-1.95.0.tgz", {}, "sha512-VSObF66DUVQe0EK3xbIoFcw+Fcia1+bLVFkMsQbmz0zCceMxPmoLImS5VM5SM7zL+/NarZ11/ySNfkekcomIkQ=="],
 
     "@playwright/test": ["@playwright/test@1.58.0", "https://registry.npmmirror.com/@playwright/test/-/test-1.58.0.tgz", { "dependencies": { "playwright": "1.58.0" }, "bin": { "playwright": "cli.js" } }, "sha512-fWza+Lpbj6SkQKCrU6si4iu+fD2dD3gxNHFhUPxsfXBPhnv3rRSQVd0NtBUT9Z/RhF/boCBcuUaMUSTRTopjZg=="],
 

@@ -3,12 +3,13 @@ use crate::apple_intelligence;
 use crate::audio_feedback::{play_feedback_sound, play_feedback_sound_blocking, SoundType};
 use crate::audio_toolkit::{is_microphone_access_denied, is_no_input_device_error, VadPolicy};
 use crate::managers::audio::AudioRecordingManager;
-use crate::managers::history::HistoryManager;
+use crate::managers::history::{HistoryManager, NewHistoryEntry};
 use crate::managers::model::ModelManager;
 use crate::managers::transcription::StreamWorkKind;
 use crate::managers::transcription::TranscriptionManager;
 use crate::settings::{get_settings, AppSettings, OverlayStyle, APPLE_INTELLIGENCE_PROVIDER_ID};
 use crate::shortcut;
+use crate::trace::{elapsed_ms, AsrTrace, LlmTrace, LOCAL_ASR_PROVIDER};
 use crate::tray::{set_tray_state, TrayIconState};
 use crate::utils::{
     self, show_processing_overlay, show_recording_overlay, show_transcribing_overlay,
@@ -137,6 +138,13 @@ fn text_model_timeout(text: &str) -> Duration {
     Duration::from_secs((15 + chars / 100).min(45))
 }
 
+/// Cleaned text-model output plus which provider/model produced it.
+#[derive(Debug, Clone)]
+pub(crate) struct TextModelOutput {
+    pub text: String,
+    pub trace: LlmTrace,
+}
+
 /// Send `user_text` with `system_prompt` to the configured text model and
 /// return cleaned, validated output. Never returns raw JSON, reasoning text or
 /// error strings as success.
@@ -144,7 +152,8 @@ pub(crate) async fn run_text_model(
     settings: &AppSettings,
     system_prompt: &str,
     user_text: &str,
-) -> Result<String, TextModelError> {
+) -> Result<TextModelOutput, TextModelError> {
+    let started = Instant::now();
     let provider = settings
         .active_post_process_provider()
         .cloned()
@@ -177,6 +186,17 @@ pub(crate) async fn run_text_model(
                 token_limit,
             ) {
                 Ok(result) => crate::voice::clean_model_output(&result, user_text)
+                    .map(|text| TextModelOutput {
+                        text,
+                        // The "model" setting here is a token limit, not a name,
+                        // and the on-device model reports no usage.
+                        trace: LlmTrace {
+                            provider: provider.id.clone(),
+                            model: None,
+                            usage: None,
+                            ms: Some(elapsed_ms(started)),
+                        },
+                    })
                     .map_err(|r| TextModelError::InvalidOutput(format!("{r:?}"))),
                 Err(err) => Err(TextModelError::Request(err.to_string())),
             };
@@ -243,11 +263,19 @@ pub(crate) async fn run_text_model(
         schema,
         disable_reasoning,
     );
-    let content = match tokio::time::timeout(text_model_timeout(user_text), request).await {
+    let completion = match tokio::time::timeout(text_model_timeout(user_text), request).await {
         Err(_) => return Err(TextModelError::Request("timed out".into())),
         Ok(Err(e)) => return Err(TextModelError::Request(e)),
-        Ok(Ok(None)) => return Err(TextModelError::InvalidOutput("no content".into())),
-        Ok(Ok(Some(content))) => content,
+        Ok(Ok(completion)) => completion,
+    };
+    let trace = LlmTrace {
+        provider: provider.id.clone(),
+        model: Some(model.clone()),
+        usage: completion.usage,
+        ms: Some(elapsed_ms(started)),
+    };
+    let Some(content) = completion.content else {
+        return Err(TextModelError::InvalidOutput("no content".into()));
     };
 
     let text = if structured {
@@ -265,6 +293,7 @@ pub(crate) async fn run_text_model(
     };
 
     crate::voice::clean_model_output(&text, user_text)
+        .map(|text| TextModelOutput { text, trace })
         .map_err(|r| TextModelError::InvalidOutput(format!("{r:?}")))
 }
 
@@ -320,6 +349,9 @@ pub(crate) struct ProcessedTranscription {
     pub final_text: String,
     pub post_processed_text: Option<String>,
     pub post_process_prompt: Option<String>,
+    /// The text model whose output is `final_text`; `None` when none ran or
+    /// its output was discarded.
+    pub llm: Option<LlmTrace>,
 }
 
 /// Resolve the persisted language *intent* into the language the currently-loaded
@@ -374,6 +406,7 @@ pub(crate) async fn process_transcription_output(
         post_processed_text: dictionary_changed.then(|| text.clone()),
         final_text: text,
         post_process_prompt: None,
+        llm: None,
     };
 
     if is_blank_transcription(&text) {
@@ -390,9 +423,10 @@ pub(crate) async fn process_transcription_output(
             };
             match run_text_model(&settings, &system_prompt, &text).await {
                 Ok(processed) => Ok(ProcessedTranscription {
-                    post_processed_text: Some(processed.clone()),
-                    final_text: processed,
+                    post_processed_text: Some(processed.text.clone()),
+                    final_text: processed.text,
                     post_process_prompt: Some(system_prompt),
+                    llm: Some(processed.trace),
                 }),
                 Err(TextModelError::NotConfigured(why)) => {
                     debug!("Dictation post-processing skipped: {why}");
@@ -416,9 +450,10 @@ pub(crate) async fn process_transcription_output(
                     .expect("translation always has a prompt");
             match run_text_model(&settings, &system_prompt, &text).await {
                 Ok(translated) => Ok(ProcessedTranscription {
-                    post_processed_text: Some(translated.clone()),
-                    final_text: translated,
+                    post_processed_text: Some(translated.text.clone()),
+                    final_text: translated.text,
                     post_process_prompt: Some(system_prompt),
+                    llm: Some(translated.trace),
                 }),
                 Err(err) => {
                     warn!("Translation failed: {err:?}");
@@ -796,32 +831,59 @@ impl ShortcutAction for TranscribeAction {
                     // fed to the stream); otherwise batch-transcribe the samples.
                     let transcription_time = Instant::now();
                     let asr_settings = get_settings(&ah);
-                    let transcription_result =
-                        if asr_settings.asr_provider == crate::settings::AsrProviderKind::Cloud {
-                            tm.cancel_stream();
-                            match complete_unless_cancelled(
-                                crate::asr::transcribe_cloud(&asr_settings, &samples),
-                                || rm.was_cancelled_since(cancel_generation),
-                            )
-                            .await
-                            {
-                                // Cancelled: the check after the WAV save returns early.
-                                None => Err(anyhow::anyhow!("cancelled")),
-                                Some(result) => result.map_err(|e| anyhow::anyhow!(e.to_string())),
+                    let uses_cloud_asr =
+                        asr_settings.asr_provider == crate::settings::AsrProviderKind::Cloud;
+                    // Record which engine handles this session, so History can
+                    // tell local from cloud recognition even when it fails.
+                    let mut asr_trace = if uses_cloud_asr {
+                        let (provider, model) = crate::asr::cloud_provider_and_model(&asr_settings);
+                        AsrTrace {
+                            provider: provider.to_string(),
+                            model: Some(model).filter(|m| !m.trim().is_empty()),
+                            usage: None,
+                            ms: None,
+                        }
+                    } else {
+                        AsrTrace {
+                            provider: LOCAL_ASR_PROVIDER.to_string(),
+                            model: tm
+                                .get_current_model()
+                                .or_else(|| Some(asr_settings.selected_model.clone()))
+                                .filter(|m| !m.is_empty()),
+                            usage: None,
+                            ms: None,
+                        }
+                    };
+                    let transcription_result = if uses_cloud_asr {
+                        tm.cancel_stream();
+                        match complete_unless_cancelled(
+                            crate::asr::transcribe_cloud(&asr_settings, &samples),
+                            || rm.was_cancelled_since(cancel_generation),
+                        )
+                        .await
+                        {
+                            // Cancelled: the check after the WAV save returns early.
+                            None => Err(anyhow::anyhow!("cancelled")),
+                            Some(Ok(cloud)) => {
+                                asr_trace.usage = cloud.usage;
+                                Ok(cloud.text)
                             }
-                        } else {
-                            match tm.finalize_stream() {
-                                // A finalized stream with usable text wins. An empty result
-                                // (no active stream, produced nothing, or a finalize error
-                                // after the engine was returned) falls back to a full batch
-                                // transcription of the same audio. A finalize timeout is
-                                // surfaced instead — the worker may still hold the engine,
-                                // so a batch fallback would contend with it.
-                                Ok(Some(text)) if !text.trim().is_empty() => Ok(text),
-                                Ok(_) => tm.transcribe(samples),
-                                Err(err) => Err(err),
-                            }
-                        };
+                            Some(Err(e)) => Err(anyhow::anyhow!(e.to_string())),
+                        }
+                    } else {
+                        match tm.finalize_stream() {
+                            // A finalized stream with usable text wins. An empty result
+                            // (no active stream, produced nothing, or a finalize error
+                            // after the engine was returned) falls back to a full batch
+                            // transcription of the same audio. A finalize timeout is
+                            // surfaced instead — the worker may still hold the engine,
+                            // so a batch fallback would contend with it.
+                            Ok(Some(text)) if !text.trim().is_empty() => Ok(text),
+                            Ok(_) => tm.transcribe(samples),
+                            Err(err) => Err(err),
+                        }
+                    };
+                    asr_trace.ms = Some(elapsed_ms(transcription_time));
 
                     // Await WAV save and verify
                     let wav_saved = match wav_handle.await {
@@ -897,15 +959,17 @@ impl ShortcutAction for TranscribeAction {
                                 Ok(processed) => processed,
                                 Err(failure) => {
                                     if wav_saved {
-                                        if let Err(err) = hm.save_entry(
+                                        if let Err(err) = hm.save_entry(NewHistoryEntry {
                                             file_name,
-                                            transcription,
-                                            true,
-                                            None,
-                                            None,
-                                            session_mode,
+                                            transcription_text: transcription,
+                                            post_process_requested: true,
+                                            post_processed_text: None,
+                                            post_process_prompt: None,
+                                            mode: session_mode,
                                             audio_ms,
-                                        ) {
+                                            asr: Some(asr_trace),
+                                            llm: None,
+                                        }) {
                                             error!("Failed to save history entry: {}", err);
                                         }
                                     }
@@ -916,15 +980,17 @@ impl ShortcutAction for TranscribeAction {
 
                             // Save to history if WAV was saved
                             if wav_saved {
-                                if let Err(err) = hm.save_entry(
+                                if let Err(err) = hm.save_entry(NewHistoryEntry {
                                     file_name,
-                                    transcription,
-                                    processed.post_process_prompt.is_some(),
-                                    processed.post_processed_text.clone(),
-                                    processed.post_process_prompt.clone(),
-                                    session_mode,
+                                    transcription_text: transcription,
+                                    post_process_requested: processed.post_process_prompt.is_some(),
+                                    post_processed_text: processed.post_processed_text.clone(),
+                                    post_process_prompt: processed.post_process_prompt.clone(),
+                                    mode: session_mode,
                                     audio_ms,
-                                ) {
+                                    asr: Some(asr_trace),
+                                    llm: processed.llm.clone(),
+                                }) {
                                     error!("Failed to save history entry: {}", err);
                                 }
                             }
@@ -956,15 +1022,17 @@ impl ShortcutAction for TranscribeAction {
                             let _ = ah.emit("transcription-error", err.to_string());
                             // Save entry with empty text so user can retry
                             if wav_saved {
-                                if let Err(save_err) = hm.save_entry(
+                                if let Err(save_err) = hm.save_entry(NewHistoryEntry {
                                     file_name,
-                                    String::new(),
-                                    uses_text_model,
-                                    None,
-                                    None,
-                                    session_mode,
+                                    transcription_text: String::new(),
+                                    post_process_requested: uses_text_model,
+                                    post_processed_text: None,
+                                    post_process_prompt: None,
+                                    mode: session_mode,
                                     audio_ms,
-                                ) {
+                                    asr: Some(asr_trace),
+                                    llm: None,
+                                }) {
                                     error!("Failed to save failed history entry: {}", save_err);
                                 }
                             }

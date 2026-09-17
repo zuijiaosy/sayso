@@ -5,7 +5,7 @@
 //! recognition context (dictionary terms). Docs:
 //! https://help.aliyun.com/zh/model-studio/qwen-asr-api-reference
 
-use super::{encode_wav, join_segments, split_for_upload, AsrError};
+use super::{encode_wav, split_for_upload, usage_from_value, AsrError, Recognized};
 use base64::Engine as _;
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -84,7 +84,7 @@ pub fn build_request_body(req: &DashScopeAsrRequest, wav_base64: &str) -> Value 
 }
 
 /// Extract recognized text, or a structured error, from a response body.
-pub fn parse_response(status: u16, body: &str) -> Result<String, AsrError> {
+pub fn parse_response(status: u16, body: &str) -> Result<Recognized, AsrError> {
     let value: Value = serde_json::from_str(body).map_err(|_| {
         if (200..300).contains(&status) {
             AsrError::InvalidResponse("response is not JSON".into())
@@ -131,14 +131,17 @@ pub fn parse_response(status: u16, body: &str) -> Result<String, AsrError> {
             .join(""),
         _ => return Err(AsrError::InvalidResponse("unexpected content type".into())),
     };
-    Ok(text.trim().to_string())
+    Ok(Recognized {
+        text: text.trim().to_string(),
+        usage: usage_from_value(&value),
+    })
 }
 
 async fn transcribe_chunk(
     client: &reqwest::Client,
     req: &DashScopeAsrRequest,
     samples: &[f32],
-) -> Result<String, AsrError> {
+) -> Result<Recognized, AsrError> {
     let wav = encode_wav(samples)?;
     let b64 = base64::engine::general_purpose::STANDARD.encode(wav);
     if b64.len() > MAX_BASE64_BYTES {
@@ -170,7 +173,10 @@ async fn transcribe_chunk(
 }
 
 /// Recognize a whole recording, splitting it when it exceeds the upload limit.
-pub async fn transcribe(req: &DashScopeAsrRequest, samples: &[f32]) -> Result<String, AsrError> {
+pub async fn transcribe(
+    req: &DashScopeAsrRequest,
+    samples: &[f32],
+) -> Result<Recognized, AsrError> {
     if req.api_key.trim().is_empty() {
         return Err(AsrError::NotConfigured("missing API key".into()));
     }
@@ -188,7 +194,7 @@ pub async fn transcribe(req: &DashScopeAsrRequest, samples: &[f32]) -> Result<St
     for chunk in split_for_upload(samples, MAX_CHUNK_SECS, 10.0) {
         parts.push(transcribe_chunk(&client, req, chunk).await?);
     }
-    Ok(join_segments(&parts))
+    Ok(Recognized::join(parts))
 }
 
 #[cfg(test)]
@@ -250,9 +256,23 @@ mod tests {
     #[test]
     fn parses_text_from_success_response() {
         let body = r#"{"output":{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":[{"text":"欢迎使用阿里云。"}],"annotations":[{"language":"zh","type":"audio_info"}]}}]},"request_id":"x"}"#;
-        assert_eq!(parse_response(200, body).unwrap(), "欢迎使用阿里云。");
+        let parsed = parse_response(200, body).unwrap();
+        assert_eq!(parsed.text, "欢迎使用阿里云。");
+        assert_eq!(parsed.usage, None);
         let empty = r#"{"output":{"choices":[{"message":{"content":[]}}]}}"#;
-        assert_eq!(parse_response(200, empty).unwrap(), "");
+        assert_eq!(parse_response(200, empty).unwrap().text, "");
+    }
+
+    #[test]
+    fn parses_usage_from_success_response() {
+        let body = r#"{"output":{"choices":[{"message":{"content":[{"text":"你好"}]}}]},"usage":{"input_tokens_details":{"text_tokens":0},"output_tokens":3,"input_tokens":52,"output_tokens_details":{"text_tokens":3},"seconds":2},"request_id":"x"}"#;
+        assert_eq!(
+            parse_response(200, body).unwrap().usage,
+            Some(crate::trace::TokenUsage {
+                input: 52,
+                output: 3
+            })
+        );
     }
 
     #[test]

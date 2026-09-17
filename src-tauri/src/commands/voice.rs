@@ -99,7 +99,7 @@ pub async fn retry_failed_translation(app: AppHandle) -> Result<(), String> {
 
     match run_text_model(&settings, &system_prompt, &failure.source_text).await {
         Ok(translated) => {
-            paste_and_finish(&app, translated, None);
+            paste_and_finish(&app, translated.text, None);
             Ok(())
         }
         Err(err) => {
@@ -474,6 +474,7 @@ pub async fn test_text_model(app: AppHandle) -> Result<String, String> {
         "ping",
     )
     .await
+    .map(|out| out.text)
     .map_err(|e| match e {
         crate::actions::TextModelError::NotConfigured(why) => format!("not configured: {why}"),
         crate::actions::TextModelError::Request(why) => why,

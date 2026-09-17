@@ -1,6 +1,6 @@
 [package]
 name = "sayso"
-version = "0.1.0"
+version = "0.2.0"
 description = "Sayso - local-first voice input (derived from Handy)"
 authors = ["cjpais", "Sayso contributors"]
 edition = "2021"

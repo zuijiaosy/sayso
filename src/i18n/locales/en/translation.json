@@ -87,7 +87,8 @@
       "openSystemSettings": "Open System Settings",
       "notSet": "Not set",
       "copied": "Copied to clipboard",
-      "loadMore": "Load more"
+      "loadMore": "Load more",
+      "close": "Close"
     },
     "shortcuts": {
       "dictate": {
@@ -135,7 +136,30 @@
       "failed": "Recognition failed",
       "copy": "Copy",
       "empty": "Nothing here yet. Press your shortcut and start speaking.",
-      "noResults": "No transcripts match that search."
+      "noResults": "No transcripts match that search.",
+      "details": "Details",
+      "recognition": "Speech recognition",
+      "textModel": "Text model",
+      "content": "Content",
+      "provider": "Provider",
+      "route": "Runs on",
+      "local": "Local",
+      "cloud": "Cloud",
+      "model": "Model",
+      "tokens": "Tokens",
+      "inputTokens": "Input tokens",
+      "outputTokens": "Output tokens",
+      "tokensNotReported": "Not reported by the provider",
+      "latency": "Processing time",
+      "latencyMs": "{{ms}} ms",
+      "latencySeconds": "{{seconds}} s",
+      "noTextModelResult": "No text model result is available.",
+      "unknown": "Not recorded. This entry predates provider tracking.",
+      "rawTranscript": "Recognized text",
+      "finalText": "Inserted text",
+      "duration": "Audio length",
+      "time": "Recorded at",
+      "emptyText": "(empty)"
     },
     "usage": {
       "weekChars": "This week",

@@ -87,7 +87,8 @@
       "openSystemSettings": "打开系统设置",
       "notSet": "未设置",
       "copied": "已复制到剪贴板",
-      "loadMore": "加载更多"
+      "loadMore": "加载更多",
+      "close": "关闭"
     },
     "shortcuts": {
       "dictate": {
@@ -135,7 +136,30 @@
       "failed": "识别失败",
       "copy": "复制",
       "empty": "还没有记录。按下快捷键开始说话吧。",
-      "noResults": "没有匹配的记录。"
+      "noResults": "没有匹配的记录。",
+      "details": "详情",
+      "recognition": "语音识别",
+      "textModel": "文本模型",
+      "content": "内容",
+      "provider": "服务商",
+      "route": "运行位置",
+      "local": "本地",
+      "cloud": "云端",
+      "model": "模型",
+      "tokens": "Token 用量",
+      "inputTokens": "输入 Token",
+      "outputTokens": "输出 Token",
+      "tokensNotReported": "服务商未返回",
+      "latency": "耗时",
+      "latencyMs": "{{ms}} 毫秒",
+      "latencySeconds": "{{seconds}} 秒",
+      "noTextModelResult": "没有可用的文本模型结果。",
+      "unknown": "未记录，这是启用服务商记录之前的条目。",
+      "rawTranscript": "识别原文",
+      "finalText": "最终插入",
+      "duration": "录音时长",
+      "time": "记录时间",
+      "emptyText": "（空）"
     },
     "usage": {
       "weekChars": "本周输入",

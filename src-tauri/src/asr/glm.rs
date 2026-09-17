@@ -7,8 +7,8 @@
 //! Docs: https://docs.bigmodel.cn/cn/guide/models/sound-and-video/glm-asr-2512
 
 use super::{
-    dedup_terms, encode_wav, join_segments, parse_transcription_response, split_for_upload,
-    transcriptions_url, AsrError,
+    dedup_terms, encode_wav, parse_transcription_response, split_for_upload, transcriptions_url,
+    AsrError, Recognized,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -52,7 +52,7 @@ pub fn form_text_fields(req: &GlmAsrRequest, include_hotwords: bool) -> Vec<(Str
     fields
 }
 
-pub fn parse_response(status: u16, body: &str) -> Result<String, AsrError> {
+pub fn parse_response(status: u16, body: &str) -> Result<Recognized, AsrError> {
     parse_transcription_response(status, body)
 }
 
@@ -61,7 +61,7 @@ async fn send_chunk(
     req: &GlmAsrRequest,
     wav: Vec<u8>,
     include_hotwords: bool,
-) -> Result<String, AsrError> {
+) -> Result<Recognized, AsrError> {
     let mut form = reqwest::multipart::Form::new();
     for (key, value) in form_text_fields(req, include_hotwords) {
         form = form.text(key, value);
@@ -97,7 +97,7 @@ async fn transcribe_chunk(
     client: &reqwest::Client,
     req: &GlmAsrRequest,
     samples: &[f32],
-) -> Result<String, AsrError> {
+) -> Result<Recognized, AsrError> {
     let wav = encode_wav(samples)?;
     let with_hotwords = !req.hotwords.is_empty() && !HOTWORDS_REJECTED.load(Ordering::Relaxed);
     match send_chunk(client, req, wav.clone(), with_hotwords).await {
@@ -110,7 +110,7 @@ async fn transcribe_chunk(
     }
 }
 
-pub async fn transcribe(req: &GlmAsrRequest, samples: &[f32]) -> Result<String, AsrError> {
+pub async fn transcribe(req: &GlmAsrRequest, samples: &[f32]) -> Result<Recognized, AsrError> {
     if req.api_key.trim().is_empty() {
         return Err(AsrError::NotConfigured("missing API key".into()));
     }
@@ -132,7 +132,7 @@ pub async fn transcribe(req: &GlmAsrRequest, samples: &[f32]) -> Result<String, 
     )
     .await;
     let parts = results.into_iter().collect::<Result<Vec<_>, _>>()?;
-    Ok(join_segments(&parts))
+    Ok(Recognized::join(parts))
 }
 
 #[cfg(test)]
@@ -182,7 +182,7 @@ mod tests {
     #[test]
     fn parses_success_and_errors() {
         let ok = r#"{"id":"x","created":1,"request_id":"r","model":"glm-asr-2512","text":" 你好，世界。 "}"#;
-        assert_eq!(parse_response(200, ok).unwrap(), "你好，世界。");
+        assert_eq!(parse_response(200, ok).unwrap().text, "你好，世界。");
         let err = r#"{"error":{"code":"1002","message":"Authorization Token非法"}}"#;
         assert_eq!(
             parse_response(401, err),

@@ -684,6 +684,8 @@ mod tests {
             post_process_requested: false,
             mode: crate::voice::SessionMode::Dictate,
             audio_ms: 0,
+            asr: None,
+            llm: None,
         }
     }
 
