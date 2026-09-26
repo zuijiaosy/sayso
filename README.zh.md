@@ -10,6 +10,32 @@ _顺口一说，即刻上屏。_
 
 从 [Handy](https://github.com/cjpais/Handy)（MIT）分叉。录音、全局热键、非激活悬浮窗、可靠粘贴和模型管理沿用上游，翻译模式、文本模型整理、词典和云端识别是新加的。
 
+<p align="center"><img src="docs/images/dictation-demo.gif" width="760" alt="口述演示：按住 Fn 说话，悬浮胶囊显示波形，整理好的文字落进聊天输入框；随后是翻译模式"></p>
+
+<p align="center"><sub>按住说话 → 识别中 → 整理中 → 文字落在光标处。接着按 Fn + 左 Shift：说中文，出来的是英文。</sub></p>
+
+## 界面截图
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/home.png" alt="首页：标语、本周数据和两个快捷键"><br><sub><b>首页</b>：Fn 口述、Fn + 左 Shift 翻译，本周数据一目了然</sub></td>
+    <td width="50%"><img src="docs/images/models-text.png" alt="模型页的文本模型：服务商、API Key 和口述整理"><br><sub><b>文本模型</b>：默认 DeepSeek，也可用任意 OpenAI 兼容接口；整理可选关闭 / 仅纠错 / 整理</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/models-asr.png" alt="模型页的语音识别：本地模型列表"><br><sub><b>语音识别</b>：默认本地 Qwen3-ASR，也可以切到云端</sub></td>
+    <td width="50%"><img src="docs/images/dictionary.png" alt="词典页：标准写法和常见误识别"><br><sub><b>词典</b>：标准写法、常见误识别、固定译法</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/history.png" alt="历史页和详情：识别原文、最终插入、所用模型和 Token"><br><sub><b>历史</b>：识别原文、最终插入的文字、所用模型和 Token 用量</sub></td>
+    <td width="50%"><img src="docs/images/usage.png" alt="使用情况：彩色指标卡和 20 周打卡图"><br><sub><b>使用情况</b>：累计字数、说话速度和 20 周打卡图</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/images/settings-dark.png" alt="深色模式下的设置页"><br><sub><b>设置</b>（深色）：开机启动、翻译语言、麦克风、悬浮条位置</sub></td>
+  </tr>
+</table>
+
+上面每一页都能在浏览器里直接点：[在线体验客户端](https://sayso-app.pages.dev/#try)。
+
 ## 功能
 
 | 功能     | 说明                                                                                                                                                             |

@@ -10,6 +10,32 @@ Website: [sayso-app.pages.dev](https://sayso-app.pages.dev) · Download: [latest
 
 Forked from [Handy](https://github.com/cjpais/Handy) (MIT). Recording, global hotkeys, the non-activating overlay, reliable paste and model management come from there. Translation mode, text-model cleanup, the dictionary and cloud recognition are new.
 
+<p align="center"><img src="docs/images/dictation-demo.gif" width="760" alt="Dictation demo: hold Fn and talk, the overlay capsule shows a waveform, the cleaned-up text lands in the chat box; then the same in translation mode"></p>
+
+<p align="center"><sub>Hold to talk → recognizing → cleaning up → the text lands at your cursor. Then Fn + Left Shift: speak Chinese, English comes out.</sub></p>
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/home.png" alt="Home page: tagline, weekly stats and the two shortcuts"><br><sub><b>Home</b>: Fn to dictate, Fn + Left Shift to translate, this week's numbers</sub></td>
+    <td width="50%"><img src="docs/images/models-text.png" alt="Models page, text model tab: provider, API key and cleanup mode"><br><sub><b>Text model</b>: DeepSeek by default, any OpenAI-compatible endpoint; cleanup off / fix / polish</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/models-asr.png" alt="Models page, speech recognition tab: local models list"><br><sub><b>Speech recognition</b>: local Qwen3-ASR by default, or cloud providers</sub></td>
+    <td width="50%"><img src="docs/images/dictionary.png" alt="Dictionary page with preferred spellings and misrecognitions"><br><sub><b>Dictionary</b>: preferred spellings, common misrecognitions, fixed translations</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/history.png" alt="History page with a detail sheet: raw transcript, final text, models and tokens"><br><sub><b>History</b>: raw transcript, inserted text, models used and token counts</sub></td>
+    <td width="50%"><img src="docs/images/usage.png" alt="Usage page: tinted metric cards and a 20-week activity grid"><br><sub><b>Usage</b>: characters, speaking speed and a 20-week activity grid</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/images/settings-dark.png" alt="Settings in dark mode"><br><sub><b>Settings</b>, dark mode: autostart, translation target, mic, overlay position</sub></td>
+  </tr>
+</table>
+
+Every screen above can be clicked through in the browser: [try the app online](https://sayso-app.pages.dev/#try).
+
 ## Features
 
 | Feature     | Notes                                                                                                                                                                                |
