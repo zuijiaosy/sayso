@@ -6,6 +6,8 @@ _顺口一说，即刻上屏。_
 
 本地优先的 macOS 语音输入。按住 Fn 说话，整理好的文字落在光标处。按住 Fn + 左 Shift 说中文，出来的是英文。
 
+官网：[sayso-8j4.pages.dev](https://sayso-8j4.pages.dev) · 下载：[最新版本](https://github.com/zuijiaosy/sayso/releases/latest)
+
 从 [Handy](https://github.com/cjpais/Handy)（MIT）分叉。录音、全局热键、非激活悬浮窗、可靠粘贴和模型管理沿用上游，翻译模式、文本模型整理、词典和云端识别是新加的。
 
 ## 功能

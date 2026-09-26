@@ -144,3 +144,28 @@ jobs:
               make_latest: "true",
             });
             core.notice(`Published ${release.tag_name}`);
+
+  notify-website:
+    name: "Refresh website"
+    needs: publish-release
+    runs-on: ubuntu-latest
+    steps:
+      # Tells the website repository to rebuild, so its version number and
+      # download links point at the release that was just published. Needs a
+      # SITE_DISPATCH_TOKEN secret (fine-grained PAT with "Contents: write" on
+      # the website repo); without it this step is skipped and the site's
+      # daily rebuild picks the release up instead.
+      - name: Dispatch sayso-release
+        env:
+          TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
+          SITE_REPO: ${{ vars.SITE_REPO || 'zuijiaosy/sayso-web' }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::notice::SITE_DISPATCH_TOKEN not set; the website refreshes on its daily schedule"
+            exit 0
+          fi
+          curl -fsS -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $TOKEN" \
+            "https://api.github.com/repos/$SITE_REPO/dispatches" \
+            -d '{"event_type":"sayso-release"}'
