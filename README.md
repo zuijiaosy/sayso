@@ -6,7 +6,7 @@ _Your say-so, on screen._
 
 Local-first voice input for macOS. Hold Fn and talk, clean text lands at your cursor. Hold Fn + Left Shift and talk in Chinese, English comes out.
 
-Website: [sayso-8j4.pages.dev](https://sayso-8j4.pages.dev) · Download: [latest release](https://github.com/zuijiaosy/sayso/releases/latest)
+Website: [sayso-app.pages.dev](https://sayso-app.pages.dev) · Download: [latest release](https://github.com/zuijiaosy/sayso/releases/latest)
 
 Forked from [Handy](https://github.com/cjpais/Handy) (MIT). Recording, global hotkeys, the non-activating overlay, reliable paste and model management come from there. Translation mode, text-model cleanup, the dictionary and cloud recognition are new.
 
