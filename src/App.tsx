@@ -12,8 +12,8 @@ import "./App.css";
 import { useSettings } from "./hooks/useSettings";
 import { commands } from "@/bindings";
 import { initializeRTL } from "@/lib/utils/rtl";
-import { Onboarding } from "./voiceless/Onboarding";
-import { SettingsShell, type PageId } from "./voiceless/SettingsShell";
+import { Onboarding } from "./sayso/Onboarding";
+import { SettingsShell, type PageId } from "./sayso/SettingsShell";
 
 type Phase = "loading" | "onboarding" | "ready";
 

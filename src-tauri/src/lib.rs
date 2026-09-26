@@ -15,7 +15,6 @@ mod input;
 mod llm_client;
 mod managers;
 mod memory;
-mod migration;
 mod overlay;
 mod paste_tx;
 pub mod portable;
@@ -649,12 +648,6 @@ pub fn run(cli_args: CliArgs) {
 
     // Detect portable mode before anything else
     portable::init();
-
-    // Adopt a previous bundle identifier's data dir. Must run before the Tauri
-    // builder exists: tauri-plugin-store caches a store the first time it is
-    // opened, so a store opened against the still-empty new dir would later
-    // overwrite the migrated file with cached defaults.
-    migration::migrate_legacy_data_dir();
 
     // Parse console logging directives from RUST_LOG, falling back to info-level logging
     // when the variable is unset

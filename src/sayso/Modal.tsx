@@ -62,8 +62,8 @@ export const Modal: React.FC<{
           <Button
             variant="ghost"
             size="sm"
-            title={t("voiceless.common.close")}
-            aria-label={t("voiceless.common.close")}
+            title={t("sayso.common.close")}
+            aria-label={t("sayso.common.close")}
             onClick={onClose}
           >
             <X size={14} />

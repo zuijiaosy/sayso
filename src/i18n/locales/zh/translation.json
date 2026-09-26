@@ -57,7 +57,7 @@
     "recorderBlocked": "当前无法录制快捷键——macOS 的 Secure Input 正在阻止按键事件。请先解决 Secure Input 警告。",
     "dismiss": "关闭"
   },
-  "voiceless": {
+  "sayso": {
     "appName": "顺口说",
     "tagline": "顺口一说，即刻上屏。",
     "home": {

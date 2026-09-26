@@ -60,51 +60,51 @@ const RouteRows: React.FC<{ route: Route; kind: ProviderKind }> = ({
     route.ms === null
       ? null
       : route.ms < 1000
-        ? t("voiceless.history.latencyMs", { ms: numbers.format(route.ms) })
-        : t("voiceless.history.latencySeconds", {
+        ? t("sayso.history.latencyMs", { ms: numbers.format(route.ms) })
+        : t("sayso.history.latencySeconds", {
             seconds: (route.ms / 1000).toFixed(2),
           });
 
   return (
     <>
-      <DetailRow label={t("voiceless.history.provider")}>
+      <DetailRow label={t("sayso.history.provider")}>
         <span className="inline-flex items-center gap-1.5">
           <ProviderIcon id={route.provider} size={14} />
           {providerName(route.provider, kind)}
         </span>
       </DetailRow>
       {kind === "asr" && (
-        <DetailRow label={t("voiceless.history.route")}>
+        <DetailRow label={t("sayso.history.route")}>
           <Chip tone={isLocal ? "neutral" : "accent"}>
             {isLocal
-              ? t("voiceless.history.local")
-              : t("voiceless.history.cloud")}
+              ? t("sayso.history.local")
+              : t("sayso.history.cloud")}
           </Chip>
         </DetailRow>
       )}
-      <DetailRow label={t("voiceless.history.model")}>
-        {model ?? t("voiceless.common.notSet")}
+      <DetailRow label={t("sayso.history.model")}>
+        {model ?? t("sayso.common.notSet")}
       </DetailRow>
       {/* On-device recognition has no token bill to show. */}
       {!isLocal &&
         (route.usage ? (
           <>
-            <DetailRow label={t("voiceless.history.inputTokens")}>
+            <DetailRow label={t("sayso.history.inputTokens")}>
               {numbers.format(route.usage.input)}
             </DetailRow>
-            <DetailRow label={t("voiceless.history.outputTokens")}>
+            <DetailRow label={t("sayso.history.outputTokens")}>
               {numbers.format(route.usage.output)}
             </DetailRow>
           </>
         ) : (
-          <DetailRow label={t("voiceless.history.tokens")}>
+          <DetailRow label={t("sayso.history.tokens")}>
             <span className="text-muted">
-              {t("voiceless.history.tokensNotReported")}
+              {t("sayso.history.tokensNotReported")}
             </span>
           </DetailRow>
         ))}
       {latency && (
-        <DetailRow label={t("voiceless.history.latency")}>{latency}</DetailRow>
+        <DetailRow label={t("sayso.history.latency")}>{latency}</DetailRow>
       )}
     </>
   );
@@ -130,49 +130,49 @@ export const HistoryDetailsModal: React.FC<{
     inserted !== null && inserted !== entry.transcription_text;
 
   return (
-    <Modal open={open} onClose={onClose} title={t("voiceless.history.details")}>
-      <Block title={t("voiceless.history.recognition")}>
+    <Modal open={open} onClose={onClose} title={t("sayso.history.details")}>
+      <Block title={t("sayso.history.recognition")}>
         {entry.asr ? (
           <RouteRows route={entry.asr} kind="asr" />
         ) : (
-          <Muted>{t("voiceless.history.unknown")}</Muted>
+          <Muted>{t("sayso.history.unknown")}</Muted>
         )}
       </Block>
 
-      <Block title={t("voiceless.history.textModel")}>
+      <Block title={t("sayso.history.textModel")}>
         {entry.llm ? (
           <RouteRows route={entry.llm} kind="llm" />
         ) : (
           <Muted>
             {entry.asr
-              ? t("voiceless.history.noTextModelResult")
-              : t("voiceless.history.unknown")}
+              ? t("sayso.history.noTextModelResult")
+              : t("sayso.history.unknown")}
           </Muted>
         )}
       </Block>
 
-      <Block title={t("voiceless.history.content")}>
-        <DetailRow label={t("voiceless.history.time")}>
+      <Block title={t("sayso.history.content")}>
+        <DetailRow label={t("sayso.history.time")}>
           {dateFormat.format(new Date(entry.timestamp * 1000))}
         </DetailRow>
-        <DetailRow label={t("voiceless.history.duration")}>
-          {t("voiceless.history.latencySeconds", {
+        <DetailRow label={t("sayso.history.duration")}>
+          {t("sayso.history.latencySeconds", {
             seconds: (entry.audio_ms / 1000).toFixed(1),
           })}
         </DetailRow>
         <div className="py-2">
           <div className="text-[13px] text-muted">
-            {t("voiceless.history.rawTranscript")}
+            {t("sayso.history.rawTranscript")}
           </div>
           <p className="mt-1 text-[13px] leading-relaxed whitespace-pre-wrap break-words">
             {entry.transcription_text.trim() ||
-              t("voiceless.history.emptyText")}
+              t("sayso.history.emptyText")}
           </p>
         </div>
         {showInserted && (
           <div className="py-2">
             <div className="text-[13px] text-muted">
-              {t("voiceless.history.finalText")}
+              {t("sayso.history.finalText")}
             </div>
             <p className="mt-1 text-[13px] leading-relaxed whitespace-pre-wrap break-words">
               {inserted}

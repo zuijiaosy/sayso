@@ -79,10 +79,6 @@ _顺口一说，即刻上屏。_
 
 设置 → 关于 →「检查更新」会打开 GitHub 上最新的安装包，下载后覆盖安装即可。0.2.0 之后的 macOS 版本都用同一张自签名证书「Sayso Release」签名，覆盖安装后麦克风、辅助功能、输入监控权限保持不变（从 0.2.0 及更早版本升级时需要重新授权一次）。推送到 `main` 会自动打包并发布新版本（`.github/workflows/release.yml`，补丁号自动加一；提交信息里带 `[skip release]` 时不发布）。维护者：证书放在 `~/.sayso-signing/`，不进仓库；本地构建用 `scripts/macos-signing.sh bun run tauri build` 签名，CI 从 `SAYSO_SIGNING_P12` / `SAYSO_SIGNING_P12_PASSWORD` 两个 Secret 读取。
 
-### 从 Voiceless 升级
-
-这个应用原来叫 Voiceless，数据存在 `com.voiceless.desktop`。首次启动时 Sayso 会把那个目录（设置、历史、录音和已下载的模型）整体搬到 `com.sayso.desktop`，不会丢东西，模型也不用重新下。macOS 的权限是跟应用身份绑定的，所以 **麦克风**、**辅助功能**、**输入监控** 需要重新授权一次。
-
 ## 许可
 
 MIT，见 `LICENSE`。第三方组件和模型权重的许可见 `THIRD_PARTY.md`。

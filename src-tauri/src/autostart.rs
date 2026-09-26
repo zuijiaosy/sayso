@@ -105,7 +105,7 @@ mod macos {
     }
 
     /// Product names used by earlier releases, newest first.
-    const LEGACY_PRODUCT_NAMES: [&str; 2] = ["Voiceless", "Handy"];
+    const LEGACY_PRODUCT_NAMES: [&str; 1] = ["Handy"];
 
     /// Path of the plist the auto-launch crate writes:
     /// `~/Library/LaunchAgents/{app name}.plist`.

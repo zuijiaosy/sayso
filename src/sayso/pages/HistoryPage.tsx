@@ -89,8 +89,8 @@ const useDayLabel = () => {
       const days = Math.round(
         (startOfDay(new Date()) - startOfDay(date)) / 86_400_000,
       );
-      if (days === 0) return t("voiceless.history.today");
-      if (days === 1) return t("voiceless.history.yesterday");
+      if (days === 0) return t("sayso.history.today");
+      if (days === 1) return t("sayso.history.yesterday");
       return format.format(date);
     },
     [format, t],
@@ -125,12 +125,12 @@ const EntryRow: React.FC<{ entry: HistoryEntry; showMode: boolean }> = ({
           <span className="select-text">{text}</span>
         ) : (
           <span className="text-muted italic">
-            {t("voiceless.history.failed")}
+            {t("sayso.history.failed")}
           </span>
         )}
         {showMode && entry.mode === "translate" && (
           <span className="ms-2 align-middle">
-            <Chip>{t("voiceless.history.filterTranslate")}</Chip>
+            <Chip>{t("sayso.history.filterTranslate")}</Chip>
           </span>
         )}
       </div>
@@ -138,8 +138,8 @@ const EntryRow: React.FC<{ entry: HistoryEntry; showMode: boolean }> = ({
         <Button
           variant="ghost"
           size="sm"
-          title={t("voiceless.history.details")}
-          aria-label={t("voiceless.history.details")}
+          title={t("sayso.history.details")}
+          aria-label={t("sayso.history.details")}
           onClick={() => setDetailsOpen(true)}
         >
           <Info size={14} />
@@ -148,11 +148,11 @@ const EntryRow: React.FC<{ entry: HistoryEntry; showMode: boolean }> = ({
           <Button
             variant="ghost"
             size="sm"
-            title={t("voiceless.history.copy")}
-            aria-label={t("voiceless.history.copy")}
+            title={t("sayso.history.copy")}
+            aria-label={t("sayso.history.copy")}
             onClick={async () => {
               await writeText(text);
-              toast.success(t("voiceless.common.copied"));
+              toast.success(t("sayso.common.copied"));
             }}
           >
             <Copy size={14} />
@@ -161,8 +161,8 @@ const EntryRow: React.FC<{ entry: HistoryEntry; showMode: boolean }> = ({
         <Button
           variant="danger-ghost"
           size="sm"
-          title={t("voiceless.common.delete")}
-          aria-label={t("voiceless.common.delete")}
+          title={t("sayso.common.delete")}
+          aria-label={t("sayso.common.delete")}
           onClick={async () => {
             const result = await commands.deleteHistoryEntry(entry.id);
             if (result.status === "error") toast.error(result.error);
@@ -275,18 +275,18 @@ export const HistoryPage: React.FC = () => {
   }, [entries, dayLabel]);
 
   return (
-    <Page title={t("voiceless.nav.history")} fill>
+    <Page title={t("sayso.nav.history")} fill>
       <div className="flex-1 min-h-0 flex flex-col gap-5">
         <div className="shrink-0 flex flex-wrap items-center justify-between gap-3">
           <Segmented<Filter>
             value={filter}
             onChange={setFilter}
             options={[
-              { value: "all", label: t("voiceless.history.filterAll") },
-              { value: "dictate", label: t("voiceless.history.filterDictate") },
+              { value: "all", label: t("sayso.history.filterAll") },
+              { value: "dictate", label: t("sayso.history.filterDictate") },
               {
                 value: "translate",
-                label: t("voiceless.history.filterTranslate"),
+                label: t("sayso.history.filterTranslate"),
               },
             ]}
           />
@@ -298,7 +298,7 @@ export const HistoryPage: React.FC = () => {
             <TextInput
               className="w-full ps-8"
               value={query}
-              placeholder={t("voiceless.history.searchPlaceholder")}
+              placeholder={t("sayso.history.searchPlaceholder")}
               spellCheck={false}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -311,8 +311,8 @@ export const HistoryPage: React.FC = () => {
           {groups.length === 0 && !loading && (
             <p className="py-8 text-center text-[13px] text-muted">
               {search
-                ? t("voiceless.history.noResults")
-                : t("voiceless.history.empty")}
+                ? t("sayso.history.noResults")
+                : t("sayso.history.empty")}
             </p>
           )}
 
@@ -344,8 +344,8 @@ export const HistoryPage: React.FC = () => {
                 }
               >
                 {loading
-                  ? t("voiceless.common.loading")
-                  : t("voiceless.common.loadMore")}
+                  ? t("sayso.common.loading")
+                  : t("sayso.common.loadMore")}
               </Button>
             </div>
           )}

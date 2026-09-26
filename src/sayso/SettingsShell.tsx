@@ -62,7 +62,7 @@ export const SettingsShell: React.FC<{
         >
           <Logo size={22} />
           <span className="font-display text-[19px] font-semibold leading-none">
-            {t("voiceless.appName")}
+            {t("sayso.appName")}
           </span>
         </div>
         {NAV.map((item) => (
@@ -73,7 +73,7 @@ export const SettingsShell: React.FC<{
             className={navClass(page === item.id)}
           >
             {item.icon}
-            {t(`voiceless.nav.${item.id}`)}
+            {t(`sayso.nav.${item.id}`)}
           </button>
         ))}
         {/* Settings sits apart from the feature pages, pinned to the bottom. */}
@@ -83,7 +83,7 @@ export const SettingsShell: React.FC<{
           className={`mt-auto ${navClass(page === "settings")}`}
         >
           <Settings size={17} />
-          {t("voiceless.nav.settings")}
+          {t("sayso.nav.settings")}
         </button>
       </nav>
       {/* The window itself never scrolls: this column is clipped to the window

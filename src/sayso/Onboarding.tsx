@@ -116,13 +116,13 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
       <Frame>
         <Logo size={64} className="mb-4" />
         <h1 className="font-display text-[30px] leading-10 font-semibold">
-          {t("voiceless.onboarding.welcome")}
+          {t("sayso.onboarding.welcome")}
         </h1>
         <p className="text-sm text-muted mt-1.5 leading-relaxed">
-          {t("voiceless.onboarding.subtitle")}
+          {t("sayso.onboarding.subtitle")}
         </p>
         <div className="mt-8">
-          <Section title={t("voiceless.onboarding.stepPermissions")}>
+          <Section title={t("sayso.onboarding.stepPermissions")}>
             <PermissionRows state={state} />
           </Section>
         </div>
@@ -133,7 +133,7 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
               <FnSettingNotice usage={usage} />
             </div>
             <p className="text-[13px] text-muted mt-4 leading-relaxed">
-              {t("voiceless.permissions.restartHint")}
+              {t("sayso.permissions.restartHint")}
             </p>
           </>
         )}
@@ -144,7 +144,7 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
             disabled={!canContinue}
             onClick={() => setStep("model")}
           >
-            {t("voiceless.onboarding.continue")}
+            {t("sayso.onboarding.continue")}
           </Button>
         </div>
       </Frame>
@@ -155,17 +155,17 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
     <Frame>
       <Logo size={64} className="mb-4" />
       <h1 className="font-display text-[30px] leading-10 font-semibold">
-        {t("voiceless.onboarding.welcome")}
+        {t("sayso.onboarding.welcome")}
       </h1>
       <div className="mt-8">
-        <Section title={t("voiceless.onboarding.stepModel")}>
+        <Section title={t("sayso.onboarding.stepModel")}>
           <div className="py-4 flex flex-col gap-3">
             <Choice
               icon={<Download size={20} />}
-              title={t("voiceless.onboarding.download", {
+              title={t("sayso.onboarding.download", {
                 name: defaultModel?.name ?? "",
               })}
-              description={t("voiceless.onboarding.downloadDesc", {
+              description={t("sayso.onboarding.downloadDesc", {
                 size: defaultModel?.size_mb ?? 0,
               })}
               disabled={pending !== null || defaultModelId === null}
@@ -180,16 +180,16 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
                   <span className="flex items-center gap-2 whitespace-nowrap text-[13px] text-muted tabular-nums">
                     <Loader2 size={15} className="animate-spin" />
                     {downloading
-                      ? t("voiceless.models.local.downloading", { percent })
-                      : t("voiceless.onboarding.finishing")}
+                      ? t("sayso.models.local.downloading", { percent })
+                      : t("sayso.onboarding.finishing")}
                   </span>
                 ) : null
               }
             />
             <Choice
               icon={<FolderOpen size={20} />}
-              title={t("voiceless.onboarding.import")}
-              description={t("voiceless.onboarding.importDesc")}
+              title={t("sayso.onboarding.import")}
+              description={t("sayso.onboarding.importDesc")}
               disabled={pending !== null}
               onClick={async () => {
                 setPending("import");
@@ -204,8 +204,8 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
             />
             <Choice
               icon={<Cloud size={20} />}
-              title={t("voiceless.onboarding.cloud")}
-              description={t("voiceless.onboarding.cloudDesc")}
+              title={t("sayso.onboarding.cloud")}
+              description={t("sayso.onboarding.cloudDesc")}
               disabled={pending !== null}
               onClick={async () => {
                 setPending("cloud");
@@ -223,7 +223,7 @@ export const Onboarding: React.FC<{ onDone: (page: PageId) => void }> = ({
           onClick={() => setStep("permissions")}
           disabled={pending !== null}
         >
-          {t("voiceless.onboarding.back")}
+          {t("sayso.onboarding.back")}
         </Button>
       </div>
     </Frame>

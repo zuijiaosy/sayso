@@ -57,7 +57,7 @@
     "recorderBlocked": "Can't record shortcuts right now — macOS Secure Input is blocking key events. Resolve the Secure Input warning first.",
     "dismiss": "Dismiss"
   },
-  "voiceless": {
+  "sayso": {
     "appName": "Sayso",
     "tagline": "Your say-so, on screen.",
     "home": {

@@ -42,19 +42,19 @@ export const FnSettingNotice: React.FC<{ usage: FnKeyUsage | null }> = ({
   return (
     <Notice
       tone="warning"
-      title={t("voiceless.shortcuts.fnWarning.title")}
+      title={t("sayso.shortcuts.fnWarning.title")}
       action={
         <Button
           variant="secondary"
           size="sm"
           onClick={() => void commands.openSystemSettingsPane("keyboard")}
         >
-          {t("voiceless.shortcuts.fnWarning.open")}
+          {t("sayso.shortcuts.fnWarning.open")}
         </Button>
       }
     >
-      {t("voiceless.shortcuts.fnWarning.body", {
-        action: t(`voiceless.shortcuts.fnActions.${usage.action}`),
+      {t("sayso.shortcuts.fnWarning.body", {
+        action: t(`sayso.shortcuts.fnActions.${usage.action}`),
       })}
     </Notice>
   );
@@ -113,31 +113,31 @@ const Hero: React.FC = () => {
       <div className="flex items-center gap-3">
         <Logo size={36} />
         <div className="font-display text-[24px] leading-8 font-semibold">
-          {t("voiceless.tagline")}
+          {t("sayso.tagline")}
         </div>
       </div>
       <p className="mt-2.5 text-[13px] leading-relaxed text-white/85">
-        {t("voiceless.home.heroHint")}
+        {t("sayso.home.heroHint")}
       </p>
       {cpm > 0 ? (
         <div className="mt-5 grid grid-cols-3 gap-3">
           <HeroStat
-            label={t("voiceless.home.statChars")}
+            label={t("sayso.home.statChars")}
             value={number.format(weekChars)}
           />
           <HeroStat
-            label={t("voiceless.home.statSpeed")}
+            label={t("sayso.home.statSpeed")}
             value={number.format(Math.round(cpm))}
-            unit={t("voiceless.usage.speedUnit")}
+            unit={t("sayso.usage.speedUnit")}
           />
           <HeroStat
-            label={t("voiceless.home.statGain")}
+            label={t("sayso.home.statGain")}
             value={`${Math.round((cpm / TYPING_BASELINE_CPM - 1) * 100)}%`}
           />
         </div>
       ) : (
         <p className="mt-5 text-[13px] text-white/75">
-          {t("voiceless.home.statEmpty")}
+          {t("sayso.home.statEmpty")}
         </p>
       )}
     </div>
@@ -154,25 +154,25 @@ export const HomePage: React.FC = () => {
     usesFn(settings?.bindings?.translate?.current_binding);
 
   return (
-    <Page title={t("voiceless.nav.home")}>
+    <Page title={t("sayso.nav.home")}>
       <Hero />
       {anyFn && <FnSettingNotice usage={usage} />}
       <Section>
         <Row
-          title={t("voiceless.shortcuts.dictate.title")}
-          description={t("voiceless.shortcuts.dictate.description")}
+          title={t("sayso.shortcuts.dictate.title")}
+          description={t("sayso.shortcuts.dictate.description")}
         >
           <ShortcutField bindingId="transcribe" />
         </Row>
         <Row
-          title={t("voiceless.shortcuts.translate.title")}
-          description={t("voiceless.shortcuts.translate.description")}
+          title={t("sayso.shortcuts.translate.title")}
+          description={t("sayso.shortcuts.translate.description")}
         >
           <ShortcutField bindingId="translate" />
         </Row>
         <Row
-          title={t("voiceless.shortcuts.activation.title")}
-          description={t("voiceless.shortcuts.activation.description")}
+          title={t("sayso.shortcuts.activation.title")}
+          description={t("sayso.shortcuts.activation.description")}
           stacked
         >
           <Segmented<ShortcutActivation>
@@ -183,23 +183,23 @@ export const HomePage: React.FC = () => {
             options={[
               {
                 value: "hold_or_toggle",
-                label: t("voiceless.shortcuts.activation.hold_or_toggle"),
+                label: t("sayso.shortcuts.activation.hold_or_toggle"),
               },
               {
                 value: "toggle",
-                label: t("voiceless.shortcuts.activation.toggle"),
+                label: t("sayso.shortcuts.activation.toggle"),
               },
               {
                 value: "push_to_talk",
-                label: t("voiceless.shortcuts.activation.push_to_talk"),
+                label: t("sayso.shortcuts.activation.push_to_talk"),
               },
             ]}
           />
         </Row>
       </Section>
       <div className="text-[13px] text-muted leading-relaxed flex flex-col gap-1.5">
-        <p>{t("voiceless.shortcuts.tips")}</p>
-        {anyFn && <p>{t("voiceless.shortcuts.fnHardware")}</p>}
+        <p>{t("sayso.shortcuts.tips")}</p>
+        {anyFn && <p>{t("sayso.shortcuts.fnHardware")}</p>}
       </div>
     </Page>
   );

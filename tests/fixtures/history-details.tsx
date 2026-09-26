@@ -4,7 +4,7 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import en from "../../src/i18n/locales/en/translation.json";
 import zh from "../../src/i18n/locales/zh/translation.json";
-import { HistoryDetailsModal } from "../../src/voiceless/pages/HistoryDetailsModal";
+import { HistoryDetailsModal } from "../../src/sayso/pages/HistoryDetailsModal";
 import { useSettingsStore } from "../../src/stores/settingsStore";
 import type { HistoryEntry } from "../../src/bindings";
 import "../../src/App.css";

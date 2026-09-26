@@ -107,11 +107,11 @@ const WindowsMicrophoneRow: React.FC = () => {
 
   return (
     <Row
-      title={t("voiceless.permissions.microphone.title")}
-      description={t("voiceless.permissions.microphone.windowsDesc")}
+      title={t("sayso.permissions.microphone.title")}
+      description={t("sayso.permissions.microphone.windowsDesc")}
     >
       {denied === false ? (
-        <StatusPill ok>{t("voiceless.permissions.granted")}</StatusPill>
+        <StatusPill ok>{t("sayso.permissions.granted")}</StatusPill>
       ) : (
         <div className="flex flex-wrap justify-end gap-2">
           <Button
@@ -119,10 +119,10 @@ const WindowsMicrophoneRow: React.FC = () => {
             size="sm"
             onClick={() => void commands.openMicrophonePrivacySettings()}
           >
-            {t("voiceless.common.openSystemSettings")}
+            {t("sayso.common.openSystemSettings")}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => void refresh()}>
-            {t("voiceless.common.recheck")}
+            {t("sayso.common.recheck")}
           </Button>
         </div>
       )}
@@ -162,11 +162,11 @@ export const PermissionRows: React.FC<{ state: PermissionState }> = ({
         return (
           <Row
             key={row.key}
-            title={t(`voiceless.permissions.${row.key}.title`)}
-            description={t(`voiceless.permissions.${row.key}.description`)}
+            title={t(`sayso.permissions.${row.key}.title`)}
+            description={t(`sayso.permissions.${row.key}.description`)}
           >
             {granted ? (
-              <StatusPill ok>{t("voiceless.permissions.granted")}</StatusPill>
+              <StatusPill ok>{t("sayso.permissions.granted")}</StatusPill>
             ) : (
               <div className="flex flex-wrap justify-end gap-2">
                 <Button
@@ -180,14 +180,14 @@ export const PermissionRows: React.FC<{ state: PermissionState }> = ({
                     }
                   }}
                 >
-                  {t("voiceless.permissions.grant")}
+                  {t("sayso.permissions.grant")}
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => void commands.openSystemSettingsPane(row.pane)}
                 >
-                  {t("voiceless.common.openSystemSettings")}
+                  {t("sayso.common.openSystemSettings")}
                 </Button>
               </div>
             )}
@@ -213,20 +213,20 @@ export const PermissionsBody: React.FC = () => {
       {/* The Fn/Globe key setting only exists on Apple keyboards. */}
       {IS_MACOS && (
         <Row
-          title={t("voiceless.permissions.fn.title")}
+          title={t("sayso.permissions.fn.title")}
           description={
             usage?.compatible
-              ? t("voiceless.permissions.fn.ok")
-              : t("voiceless.permissions.fn.bad", {
+              ? t("sayso.permissions.fn.ok")
+              : t("sayso.permissions.fn.bad", {
                   action: t(
-                    `voiceless.shortcuts.fnActions.${usage?.action ?? "unknown"}`,
+                    `sayso.shortcuts.fnActions.${usage?.action ?? "unknown"}`,
                   ),
                 })
           }
         >
           {usage?.compatible ? (
             <StatusPill ok>
-              {t("voiceless.shortcuts.fnActions.do_nothing")}
+              {t("sayso.shortcuts.fnActions.do_nothing")}
             </StatusPill>
           ) : (
             <div className="flex flex-wrap justify-end gap-2">
@@ -235,10 +235,10 @@ export const PermissionsBody: React.FC = () => {
                 size="sm"
                 onClick={() => void commands.openSystemSettingsPane("keyboard")}
               >
-                {t("voiceless.shortcuts.fnWarning.open")}
+                {t("sayso.shortcuts.fnWarning.open")}
               </Button>
               <Button variant="ghost" size="sm" onClick={refresh}>
-                {t("voiceless.common.recheck")}
+                {t("sayso.common.recheck")}
               </Button>
             </div>
           )}
@@ -246,7 +246,7 @@ export const PermissionsBody: React.FC = () => {
       )}
       {IS_MACOS && (
         <p className="py-3 text-[13px] text-muted leading-relaxed">
-          {t("voiceless.permissions.restartHint")}
+          {t("sayso.permissions.restartHint")}
         </p>
       )}
     </>

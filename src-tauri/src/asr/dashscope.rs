@@ -308,11 +308,11 @@ mod tests {
 
     /// Live check of the endpoint and error parsing with a deliberately
     /// invalid key and one second of silence. Run with
-    /// `VOICELESS_LIVE_TESTS=1 cargo test --lib live_invalid_key -- --ignored`.
+    /// `SAYSO_LIVE_TESTS=1 cargo test --lib live_invalid_key -- --ignored`.
     #[test]
     #[ignore]
     fn live_invalid_key_is_rejected_by_service() {
-        if std::env::var("VOICELESS_LIVE_TESTS").ok().as_deref() != Some("1") {
+        if std::env::var("SAYSO_LIVE_TESTS").ok().as_deref() != Some("1") {
             return;
         }
         let mut req = request();

@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Voiceless 需要使用麦克风进行语音输入。Voiceless uses the microphone for voice input.</string>
+  <string>顺口说需要使用麦克风进行语音输入。Sayso uses the microphone for voice input.</string>
 </dict>
 </plist>

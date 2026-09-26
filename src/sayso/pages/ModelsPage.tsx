@@ -76,11 +76,11 @@ export const importSenseVoiceFolder = async (
   const result = await commands.importSenseVoiceModel(selected);
   if (result.status === "error") {
     toast.error(
-      t("voiceless.models.local.importFailed", { error: result.error }),
+      t("sayso.models.local.importFailed", { error: result.error }),
     );
     return false;
   }
-  toast.success(t("voiceless.models.local.importOk"));
+  toast.success(t("sayso.models.local.importOk"));
   await useModelStore.getState().loadModels();
   await useModelStore.getState().loadCurrentModel();
   return true;
@@ -115,14 +115,14 @@ const ModelRow: React.FC<{
     status = (
       <div className="flex items-center gap-2">
         <span className="text-[13px] text-muted tabular-nums">
-          {t("voiceless.models.local.downloading", { percent })}
+          {t("sayso.models.local.downloading", { percent })}
         </span>
         <Button
           variant="secondary"
           size="sm"
           onClick={() => void cancelDownload(model.id)}
         >
-          {t("voiceless.models.local.cancel")}
+          {t("sayso.models.local.cancel")}
         </Button>
       </div>
     );
@@ -131,8 +131,8 @@ const ModelRow: React.FC<{
       <span className="text-[13px] text-muted">
         {t(
           verifying
-            ? "voiceless.models.local.verifying"
-            : "voiceless.models.local.extracting",
+            ? "sayso.models.local.verifying"
+            : "sayso.models.local.extracting",
         )}
       </span>
     );
@@ -143,11 +143,11 @@ const ModelRow: React.FC<{
         size="sm"
         onClick={() => void downloadModel(model.id)}
       >
-        {t("voiceless.models.local.download")}
+        {t("sayso.models.local.download")}
       </Button>
     );
   } else if (inUse) {
-    status = <StatusPill ok>{t("voiceless.models.local.inUse")}</StatusPill>;
+    status = <StatusPill ok>{t("sayso.models.local.inUse")}</StatusPill>;
   } else {
     status = (
       <div className="flex items-center gap-1">
@@ -161,7 +161,7 @@ const ModelRow: React.FC<{
             setBusy(false);
           }}
         >
-          {t("voiceless.models.local.use")}
+          {t("sayso.models.local.use")}
         </Button>
         {!model.is_custom && (
           <Button
@@ -169,7 +169,7 @@ const ModelRow: React.FC<{
             size="sm"
             onClick={() => void deleteModel(model.id)}
           >
-            {t("voiceless.models.local.delete")}
+            {t("sayso.models.local.delete")}
           </Button>
         )}
       </div>
@@ -183,14 +183,14 @@ const ModelRow: React.FC<{
           <span className="truncate">{model.name}</span>
           {model.id === defaultModelId && (
             <span className="shrink-0">
-              <Chip>{t("voiceless.models.local.recommended")}</Chip>
+              <Chip>{t("sayso.models.local.recommended")}</Chip>
             </span>
           )}
         </span>
       }
       description={
         <>
-          {t("voiceless.models.local.size", { size: model.size_mb })}
+          {t("sayso.models.local.size", { size: model.size_mb })}
           {" · "}
           {model.supported_languages.slice(0, 6).join(", ")}
           {model.supported_languages.length > 6 ? "…" : ""}
@@ -213,7 +213,7 @@ const LocalModels: React.FC = () => {
   return (
     <>
       {visible.length === 0 && (
-        <Row title={t("voiceless.models.local.empty")} />
+        <Row title={t("sayso.models.local.empty")} />
       )}
       {visible.map((model) => (
         <ModelRow
@@ -239,7 +239,7 @@ const LocalModels: React.FC = () => {
             onClick={() => void importSenseVoiceFolder(t)}
           >
             <FolderOpen size={14} />
-            {t("voiceless.models.local.import")}
+            {t("sayso.models.local.import")}
           </Button>
           <Button
             variant="ghost"
@@ -255,7 +255,7 @@ const LocalModels: React.FC = () => {
           </Button>
         </div>
         <p className="text-xs text-muted leading-relaxed">
-          {t("voiceless.models.local.importDesc")}
+          {t("sayso.models.local.importDesc")}
         </p>
       </div>
     </>
@@ -294,7 +294,7 @@ const CloudApiKeyRow: React.FC<{
 
   return (
     <Row
-      title={t("voiceless.models.cloud.apiKey")}
+      title={t("sayso.models.cloud.apiKey")}
       description={description}
       stacked
     >
@@ -329,7 +329,7 @@ const DashscopeForm: React.FC = () => {
   if (!draft) return null;
 
   const languageName = (code: string) => {
-    if (code === "auto") return t("voiceless.models.cloud.languageAuto");
+    if (code === "auto") return t("sayso.models.cloud.languageAuto");
     try {
       return (
         new Intl.DisplayNames([i18n.language, "en"], { type: "language" }).of(
@@ -349,8 +349,8 @@ const DashscopeForm: React.FC = () => {
   return (
     <>
       <Row
-        title={t("voiceless.models.cloud.endpoint")}
-        description={t("voiceless.models.cloud.endpointDesc")}
+        title={t("sayso.models.cloud.endpoint")}
+        description={t("sayso.models.cloud.endpointDesc")}
         stacked
       >
         <TextInput
@@ -363,9 +363,9 @@ const DashscopeForm: React.FC = () => {
       </Row>
       <CloudApiKeyRow
         vendor="dashscope"
-        description={t("voiceless.models.cloud.apiKeyDesc")}
+        description={t("sayso.models.cloud.apiKeyDesc")}
       />
-      <Row title={t("voiceless.models.cloud.model")}>
+      <Row title={t("sayso.models.cloud.model")}>
         <TextInput
           className="w-56 max-w-full"
           value={draft.model}
@@ -374,7 +374,7 @@ const DashscopeForm: React.FC = () => {
           onBlur={() => void save(draft)}
         />
       </Row>
-      <Row title={t("voiceless.models.cloud.language")}>
+      <Row title={t("sayso.models.cloud.language")}>
         <SelectInput
           value={draft.language}
           onChange={(e) => void save({ ...draft, language: e.target.value })}
@@ -387,8 +387,8 @@ const DashscopeForm: React.FC = () => {
         </SelectInput>
       </Row>
       <Row
-        title={t("voiceless.models.cloud.sendDictionary")}
-        description={t("voiceless.models.cloud.sendDictionaryDesc")}
+        title={t("sayso.models.cloud.sendDictionary")}
+        description={t("sayso.models.cloud.sendDictionaryDesc")}
       >
         <Switch
           checked={draft.send_dictionary}
@@ -430,8 +430,8 @@ const HotwordVendorForm: React.FC<{
   return (
     <>
       <Row
-        title={t("voiceless.models.cloud.endpoint")}
-        description={t(`voiceless.models.${vendor}.endpointDesc`)}
+        title={t("sayso.models.cloud.endpoint")}
+        description={t(`sayso.models.${vendor}.endpointDesc`)}
         stacked
       >
         <TextInput
@@ -444,9 +444,9 @@ const HotwordVendorForm: React.FC<{
       </Row>
       <CloudApiKeyRow
         vendor={vendor}
-        description={t(`voiceless.models.${vendor}.apiKeyDesc`)}
+        description={t(`sayso.models.${vendor}.apiKeyDesc`)}
       />
-      <Row title={t("voiceless.models.cloud.model")}>
+      <Row title={t("sayso.models.cloud.model")}>
         <TextInput
           className="w-56 max-w-full"
           value={draft.model}
@@ -456,8 +456,8 @@ const HotwordVendorForm: React.FC<{
         />
       </Row>
       <Row
-        title={t(`voiceless.models.${vendor}.sendDictionary`)}
-        description={t(`voiceless.models.${vendor}.sendDictionaryDesc`)}
+        title={t(`sayso.models.${vendor}.sendDictionary`)}
+        description={t(`sayso.models.${vendor}.sendDictionaryDesc`)}
       >
         <Switch
           checked={draft.send_dictionary}
@@ -484,10 +484,10 @@ const CloudAsrBody: React.FC = () => {
     const result = await commands.testCloudAsr();
     setTesting(false);
     if (result.status === "ok") {
-      toast.success(t("voiceless.models.cloud.testOk", { ms: result.data }));
+      toast.success(t("sayso.models.cloud.testOk", { ms: result.data }));
     } else {
       toast.error(
-        t("voiceless.models.cloud.testFailed", { error: result.error }),
+        t("sayso.models.cloud.testFailed", { error: result.error }),
       );
     }
   };
@@ -498,7 +498,7 @@ const CloudAsrBody: React.FC = () => {
         title={
           <span className="inline-flex items-center gap-2">
             <ProviderIcon id={vendor} size={16} className="text-muted" />
-            {t("voiceless.models.cloud.vendor")}
+            {t("sayso.models.cloud.vendor")}
           </span>
         }
       >
@@ -512,11 +512,11 @@ const CloudAsrBody: React.FC = () => {
           }}
         >
           <option value="dashscope">
-            {t("voiceless.models.cloud.vendorDashscope")}
+            {t("sayso.models.cloud.vendorDashscope")}
           </option>
-          <option value="glm">{t("voiceless.models.cloud.vendorGlm")}</option>
+          <option value="glm">{t("sayso.models.cloud.vendorGlm")}</option>
           <option value="stepfun">
-            {t("voiceless.models.cloud.vendorStepfun")}
+            {t("sayso.models.cloud.vendorStepfun")}
           </option>
         </SelectInput>
       </Row>
@@ -538,7 +538,7 @@ const CloudAsrBody: React.FC = () => {
           disabled={testing}
           onClick={() => void test()}
         >
-          {testing ? t("voiceless.common.testing") : t("voiceless.common.test")}
+          {testing ? t("sayso.common.testing") : t("sayso.common.test")}
         </Button>
       </div>
     </>
@@ -587,10 +587,10 @@ const TextModelBody: React.FC = () => {
     const result = await commands.testTextModel();
     setTesting(false);
     if (result.status === "ok")
-      toast.success(t("voiceless.models.text.testOk"));
+      toast.success(t("sayso.models.text.testOk"));
     else
       toast.error(
-        t("voiceless.models.text.testFailed", { error: result.error }),
+        t("sayso.models.text.testFailed", { error: result.error }),
       );
   };
 
@@ -599,7 +599,7 @@ const TextModelBody: React.FC = () => {
       {!configured && (
         <div className="pt-4">
           <Notice tone="info">
-            {t("voiceless.models.text.notConfigured")}
+            {t("sayso.models.text.notConfigured")}
           </Notice>
         </div>
       )}
@@ -607,7 +607,7 @@ const TextModelBody: React.FC = () => {
         title={
           <span className="inline-flex items-center gap-2">
             <ProviderIcon id={providerId} size={16} className="text-muted" />
-            {t("voiceless.models.text.provider")}
+            {t("sayso.models.text.provider")}
           </span>
         }
       >
@@ -624,7 +624,7 @@ const TextModelBody: React.FC = () => {
       </Row>
       {!isApple && (
         <>
-          <Row title={t("voiceless.models.text.baseUrl")} stacked>
+          <Row title={t("sayso.models.text.baseUrl")} stacked>
             <TextInput
               className="w-full"
               value={baseUrl}
@@ -637,7 +637,7 @@ const TextModelBody: React.FC = () => {
               }}
             />
           </Row>
-          <Row title={t("voiceless.models.text.apiKey")} stacked>
+          <Row title={t("sayso.models.text.apiKey")} stacked>
             <TextInput
               className="w-full"
               type="password"
@@ -653,7 +653,7 @@ const TextModelBody: React.FC = () => {
           </Row>
         </>
       )}
-      <Row title={t("voiceless.models.text.model")}>
+      <Row title={t("sayso.models.text.model")}>
         <div className="flex items-center gap-2 min-w-0">
           <TextInput
             className="w-56 max-w-full"
@@ -676,8 +676,8 @@ const TextModelBody: React.FC = () => {
               variant="ghost"
               size="sm"
               className="shrink-0"
-              title={t("voiceless.models.text.fetchModels")}
-              aria-label={t("voiceless.models.text.fetchModels")}
+              title={t("sayso.models.text.fetchModels")}
+              aria-label={t("sayso.models.text.fetchModels")}
               onClick={() => void fetchPostProcessModels(providerId)}
             >
               <RefreshCw size={14} />
@@ -692,21 +692,21 @@ const TextModelBody: React.FC = () => {
           disabled={testing}
           onClick={() => void test()}
         >
-          {testing ? t("voiceless.common.testing") : t("voiceless.common.test")}
+          {testing ? t("sayso.common.testing") : t("sayso.common.test")}
         </Button>
       </div>
       <Row
-        title={t("voiceless.models.text.mode.title")}
-        description={t(`voiceless.models.text.mode.${mode}Desc`)}
+        title={t("sayso.models.text.mode.title")}
+        description={t(`sayso.models.text.mode.${mode}Desc`)}
         stacked
       >
         <Segmented<DictationPostMode>
           value={mode}
           onChange={(value) => void updateSetting("dictation_post_mode", value)}
           options={[
-            { value: "off", label: t("voiceless.models.text.mode.off") },
-            { value: "fix", label: t("voiceless.models.text.mode.fix") },
-            { value: "polish", label: t("voiceless.models.text.mode.polish") },
+            { value: "off", label: t("sayso.models.text.mode.off") },
+            { value: "fix", label: t("sayso.models.text.mode.fix") },
+            { value: "polish", label: t("sayso.models.text.mode.polish") },
           ]}
         />
       </Row>
@@ -740,41 +740,41 @@ export const ModelsPage: React.FC = () => {
   };
 
   return (
-    <Page title={t("voiceless.models.title")}>
+    <Page title={t("sayso.models.title")}>
       <TabbedSection<ModelsTab>
         value={tab}
         onChange={setTab}
         tabs={[
           {
             value: "asr",
-            label: t("voiceless.models.asr.title"),
+            label: t("sayso.models.asr.title"),
             icon: <AudioLines size={20} />,
-            description: t("voiceless.models.asr.description"),
+            description: t("sayso.models.asr.description"),
           },
           {
             value: "text",
-            label: t("voiceless.models.text.title"),
+            label: t("sayso.models.text.title"),
             icon: <Sparkles size={20} />,
-            description: t("voiceless.models.text.description"),
+            description: t("sayso.models.text.description"),
           },
         ]}
       >
         {tab === "asr" ? (
           <>
             <Row
-              title={t("voiceless.models.asr.mode")}
+              title={t("sayso.models.asr.mode")}
               description={
                 provider === "local"
-                  ? t("voiceless.models.asr.localDesc")
-                  : t("voiceless.models.asr.cloudDesc")
+                  ? t("sayso.models.asr.localDesc")
+                  : t("sayso.models.asr.cloudDesc")
               }
             >
               <Segmented<AsrProviderKind>
                 value={provider}
                 onChange={(value) => void switchProvider(value)}
                 options={[
-                  { value: "local", label: t("voiceless.models.asr.local") },
-                  { value: "cloud", label: t("voiceless.models.asr.cloud") },
+                  { value: "local", label: t("sayso.models.asr.local") },
+                  { value: "cloud", label: t("sayso.models.asr.cloud") },
                 ]}
               />
             </Row>

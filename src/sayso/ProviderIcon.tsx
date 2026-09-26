@@ -93,9 +93,9 @@ export const ProviderIcon: React.FC<{
 };
 
 const ASR_VENDOR_KEYS: Record<string, string> = {
-  dashscope: "voiceless.models.cloud.vendorDashscope",
-  glm: "voiceless.models.cloud.vendorGlm",
-  stepfun: "voiceless.models.cloud.vendorStepfun",
+  dashscope: "sayso.models.cloud.vendorDashscope",
+  glm: "sayso.models.cloud.vendorGlm",
+  stepfun: "sayso.models.cloud.vendorStepfun",
 };
 
 /**
@@ -110,7 +110,7 @@ export const useProviderNames = () => {
   const providerName = useCallback(
     (id: string, kind: ProviderKind) => {
       if (kind === "asr") {
-        if (id === LOCAL_PROVIDER) return t("voiceless.history.local");
+        if (id === LOCAL_PROVIDER) return t("sayso.history.local");
         const key = ASR_VENDOR_KEYS[id];
         return key ? t(key) : id;
       }

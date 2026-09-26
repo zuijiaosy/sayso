@@ -124,14 +124,14 @@ export const DictionaryPage: React.FC = () => {
     setImportOpen(false);
     setImportText("");
     toast.success(
-      t("voiceless.dictionary.imported", { count: entries.length }),
+      t("sayso.dictionary.imported", { count: entries.length }),
     );
   };
 
   const exportText = async () => {
     const text = await commands.exportDictionaryText();
     await writeText(text);
-    toast.success(t("voiceless.dictionary.copied"));
+    toast.success(t("sayso.dictionary.copied"));
   };
 
   const showSearch = (drafts?.length ?? 0) > 6;
@@ -148,14 +148,14 @@ export const DictionaryPage: React.FC = () => {
 
   return (
     <Page
-      title={t("voiceless.dictionary.title")}
-      description={t("voiceless.dictionary.description")}
+      title={t("sayso.dictionary.title")}
+      description={t("sayso.dictionary.description")}
       fill
     >
       <Section
         fill
         icon={<BookOpen size={20} />}
-        title={t("voiceless.dictionary.title")}
+        title={t("sayso.dictionary.title")}
         actions={
           <>
             <Button
@@ -163,14 +163,14 @@ export const DictionaryPage: React.FC = () => {
               size="sm"
               onClick={() => setImportOpen(!importOpen)}
             >
-              {t("voiceless.dictionary.import")}
+              {t("sayso.dictionary.import")}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => void exportText()}>
-              {t("voiceless.dictionary.export")}
+              {t("sayso.dictionary.export")}
             </Button>
             <Button variant="primary" size="sm" onClick={add}>
               <Plus size={14} />
-              {t("voiceless.dictionary.add")}
+              {t("sayso.dictionary.add")}
             </Button>
           </>
         }
@@ -182,11 +182,11 @@ export const DictionaryPage: React.FC = () => {
               {importOpen && (
                 <div className="py-4 flex flex-col gap-2">
                   <div className="text-[15px] font-semibold">
-                    {t("voiceless.dictionary.importTitle")}
+                    {t("sayso.dictionary.importTitle")}
                   </div>
                   <textarea
                     className="w-full min-w-0 min-h-32 p-3 text-sm font-mono rounded-control border border-border bg-surface focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
-                    placeholder={t("voiceless.dictionary.importPlaceholder")}
+                    placeholder={t("sayso.dictionary.importPlaceholder")}
                     value={importText}
                     spellCheck={false}
                     onChange={(e) => setImportText(e.target.value)}
@@ -198,7 +198,7 @@ export const DictionaryPage: React.FC = () => {
                       onClick={() => void runImport(true)}
                       disabled={!importText.trim()}
                     >
-                      {t("voiceless.dictionary.importReplace")}
+                      {t("sayso.dictionary.importReplace")}
                     </Button>
                     <Button
                       variant="primary"
@@ -206,7 +206,7 @@ export const DictionaryPage: React.FC = () => {
                       onClick={() => void runImport(false)}
                       disabled={!importText.trim()}
                     >
-                      {t("voiceless.dictionary.importMerge")}
+                      {t("sayso.dictionary.importMerge")}
                     </Button>
                   </div>
                 </div>
@@ -221,7 +221,7 @@ export const DictionaryPage: React.FC = () => {
                     />
                     <TextInput
                       className="w-full ps-9"
-                      placeholder={t("voiceless.dictionary.search")}
+                      placeholder={t("sayso.dictionary.search")}
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                     />
@@ -234,7 +234,7 @@ export const DictionaryPage: React.FC = () => {
       >
         {drafts !== null && drafts.length === 0 && (
           <p className="py-6 text-sm text-muted">
-            {t("voiceless.dictionary.empty")}
+            {t("sayso.dictionary.empty")}
           </p>
         )}
 
@@ -254,13 +254,13 @@ export const DictionaryPage: React.FC = () => {
                   type="button"
                   className="flex-1 min-w-0 flex items-center gap-2 py-2 text-start cursor-pointer"
                   aria-expanded={open}
-                  title={t("voiceless.dictionary.more")}
+                  title={t("sayso.dictionary.more")}
                   onClick={() => toggle(draft.key)}
                 >
                   <span className="flex-1 min-w-0 truncate text-[14px]">
                     {draft.term.trim() || (
                       <span className="text-muted italic">
-                        {t("voiceless.dictionary.term")}
+                        {t("sayso.dictionary.term")}
                       </span>
                     )}
                   </span>
@@ -281,8 +281,8 @@ export const DictionaryPage: React.FC = () => {
                       ? ""
                       : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                   }`}
-                  aria-label={t("voiceless.common.delete")}
-                  title={t("voiceless.common.delete")}
+                  aria-label={t("sayso.common.delete")}
+                  title={t("sayso.common.delete")}
                   onClick={() => remove(draft.key)}
                 >
                   <Trash2 size={14} />
@@ -291,7 +291,7 @@ export const DictionaryPage: React.FC = () => {
               {open && (
                 <div className="pb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
                   <Field
-                    label={t("voiceless.dictionary.term")}
+                    label={t("sayso.dictionary.term")}
                     value={draft.term}
                     autoFocus={!draft.term}
                     spellCheck={false}
@@ -300,16 +300,16 @@ export const DictionaryPage: React.FC = () => {
                     }
                   />
                   <Field
-                    label={t("voiceless.dictionary.aliases")}
+                    label={t("sayso.dictionary.aliases")}
                     value={draft.aliases}
-                    placeholder={t("voiceless.dictionary.aliasesPlaceholder")}
+                    placeholder={t("sayso.dictionary.aliasesPlaceholder")}
                     spellCheck={false}
                     onChange={(e) =>
                       update(draft.key, { aliases: e.target.value })
                     }
                   />
                   <Field
-                    label={t("voiceless.dictionary.translation")}
+                    label={t("sayso.dictionary.translation")}
                     value={draft.translation}
                     spellCheck={false}
                     onChange={(e) =>
@@ -317,7 +317,7 @@ export const DictionaryPage: React.FC = () => {
                     }
                   />
                   <Field
-                    label={t("voiceless.dictionary.note")}
+                    label={t("sayso.dictionary.note")}
                     value={draft.note}
                     onChange={(e) =>
                       update(draft.key, { note: e.target.value })

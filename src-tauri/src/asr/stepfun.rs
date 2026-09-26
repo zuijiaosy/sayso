@@ -217,11 +217,11 @@ mod tests {
         assert!(chunks.iter().all(|c| c.len() <= 16_000 * 185));
     }
 
-    /// `VOICELESS_LIVE_TESTS=1 cargo test --lib live_stepfun -- --ignored`
+    /// `SAYSO_LIVE_TESTS=1 cargo test --lib live_stepfun -- --ignored`
     #[test]
     #[ignore]
     fn live_stepfun_invalid_key_is_rejected() {
-        if std::env::var("VOICELESS_LIVE_TESTS").ok().as_deref() != Some("1") {
+        if std::env::var("SAYSO_LIVE_TESTS").ok().as_deref() != Some("1") {
             return;
         }
         let mut req = request();

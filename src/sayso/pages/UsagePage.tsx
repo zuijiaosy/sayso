@@ -205,7 +205,7 @@ const Heatmap: React.FC<{ totals: Map<string, DayTotals> }> = ({ totals }) => {
                   <span
                     key={key}
                     title={`${dayFormat.format(date)} · ${t(
-                      "voiceless.usage.charsUnit",
+                      "sayso.usage.charsUnit",
                       { count: chars },
                     )}`}
                     className={`w-3 h-3 rounded-pill ${
@@ -287,8 +287,8 @@ export const UsagePage: React.FC = () => {
   const duration = useCallback(
     (ms: number) => {
       const minutes = Math.round(ms / 60_000);
-      if (minutes < 60) return t("voiceless.usage.minutes", { count: minutes });
-      return t("voiceless.usage.hoursMinutes", {
+      if (minutes < 60) return t("sayso.usage.minutes", { count: minutes });
+      return t("sayso.usage.hoursMinutes", {
         hours: Math.floor(minutes / 60),
         minutes: minutes % 60,
       });
@@ -304,45 +304,45 @@ export const UsagePage: React.FC = () => {
 
   const share = async () => {
     await writeText(
-      t("voiceless.usage.shareText", {
+      t("sayso.usage.shareText", {
         chars: number.format(stats.all.chars),
         speed,
         gain,
         streak: stats.current,
       }),
     );
-    toast.success(t("voiceless.common.copied"));
+    toast.success(t("sayso.common.copied"));
   };
 
   return (
-    <Page title={t("voiceless.nav.usage")}>
+    <Page title={t("sayso.nav.usage")}>
       <div className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Segmented<Filter>
             value={filter}
             onChange={setFilter}
             options={[
-              { value: "all", label: t("voiceless.history.filterAll") },
-              { value: "dictate", label: t("voiceless.history.filterDictate") },
+              { value: "all", label: t("sayso.history.filterAll") },
+              { value: "dictate", label: t("sayso.history.filterDictate") },
               {
                 value: "translate",
-                label: t("voiceless.history.filterTranslate"),
+                label: t("sayso.history.filterTranslate"),
               },
             ]}
           />
           <Button variant="secondary" size="sm" onClick={() => void share()}>
             <Share2 size={14} />
-            {t("voiceless.usage.share")}
+            {t("sayso.usage.share")}
           </Button>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Metric
-            label={t("voiceless.usage.weekChars")}
+            label={t("sayso.usage.weekChars")}
             value={number.format(stats.weekChars)}
             hint={
               filter === "all" && stats.all.chars > 0
-                ? t("voiceless.usage.split", {
+                ? t("sayso.usage.split", {
                     dictate: Math.round(stats.dictateShare * 100),
                     translate: 100 - Math.round(stats.dictateShare * 100),
                   })
@@ -351,30 +351,30 @@ export const UsagePage: React.FC = () => {
             tint={"--color-tint-peach"}
           />
           <Metric
-            label={t("voiceless.usage.totalChars")}
+            label={t("sayso.usage.totalChars")}
             value={number.format(stats.all.chars)}
             tint={"--color-tint-butter"}
           />
           <Metric
-            label={t("voiceless.usage.sessions")}
+            label={t("sayso.usage.sessions")}
             value={number.format(stats.all.sessions)}
             tint={"--color-tint-sage"}
           />
           <Metric
-            label={t("voiceless.usage.duration")}
+            label={t("sayso.usage.duration")}
             value={duration(stats.all.audioMs)}
             tint={"--color-tint-sky"}
           />
           <Metric
-            label={t("voiceless.usage.speed")}
+            label={t("sayso.usage.speed")}
             value={speed}
-            hint={t("voiceless.usage.speedUnit")}
+            hint={t("sayso.usage.speedUnit")}
             tint={"--color-tint-lilac"}
           />
           <Metric
-            label={t("voiceless.usage.gain")}
+            label={t("sayso.usage.gain")}
             value={gain}
-            hint={t("voiceless.usage.gainHint", {
+            hint={t("sayso.usage.gainHint", {
               baseline: TYPING_BASELINE_CPM,
             })}
             tint={"--color-tint-rose"}
@@ -384,10 +384,10 @@ export const UsagePage: React.FC = () => {
         <div className="rounded-card bg-surface shadow-card px-4 py-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2 pb-3">
             <h2 className="text-[14px] font-semibold">
-              {t("voiceless.usage.activeDays", { count: stats.activeDays })}
+              {t("sayso.usage.activeDays", { count: stats.activeDays })}
             </h2>
             <span className="text-[12px] text-muted">
-              {t("voiceless.usage.streak", {
+              {t("sayso.usage.streak", {
                 current: stats.current,
                 longest: stats.longest,
               })}
@@ -395,14 +395,14 @@ export const UsagePage: React.FC = () => {
           </div>
           <Heatmap totals={totals} />
           <div className="mt-2 flex items-center justify-end gap-1.5 text-[11px] text-muted">
-            <span>{t("voiceless.usage.less")}</span>
+            <span>{t("sayso.usage.less")}</span>
             {LEVEL_CLASS.map((className) => (
               <span
                 key={className}
                 className={`w-2.5 h-2.5 rounded-pill ${className}`}
               />
             ))}
-            <span>{t("voiceless.usage.more")}</span>
+            <span>{t("sayso.usage.more")}</span>
           </div>
         </div>
       </div>

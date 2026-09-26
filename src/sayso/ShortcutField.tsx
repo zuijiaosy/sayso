@@ -49,7 +49,7 @@ function useShortcutRecorder() {
         await updateBinding(recordingId, keys);
       } catch (error) {
         toast.error(
-          t("voiceless.shortcuts.errors.set", { error: String(error) }),
+          t("sayso.shortcuts.errors.set", { error: String(error) }),
         );
         await refreshSettings();
       }
@@ -107,7 +107,7 @@ function useShortcutRecorder() {
           });
         } else {
           toast.error(
-            t("voiceless.shortcuts.errors.set", { error: result.error }),
+            t("sayso.shortcuts.errors.set", { error: result.error }),
           );
         }
         return;
@@ -188,14 +188,14 @@ export const ShortcutField: React.FC<{ bindingId: string }> = ({
             : bindingChips(binding?.current_binding)
         }
         recording={recording}
-        placeholder={t("voiceless.shortcuts.pressKeys")}
+        placeholder={t("sayso.shortcuts.pressKeys")}
         onClick={() => void start(bindingId)}
         trailing={
           !isDefault && !recording ? (
             <button
               type="button"
-              title={t("voiceless.shortcuts.reset")}
-              aria-label={t("voiceless.shortcuts.reset")}
+              title={t("sayso.shortcuts.reset")}
+              aria-label={t("sayso.shortcuts.reset")}
               className="shrink-0 p-1.5 rounded-md text-muted hover:text-text hover:bg-muted/15 cursor-pointer"
               onClick={() => void resetBinding(bindingId)}
             >

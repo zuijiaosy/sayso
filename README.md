@@ -79,10 +79,6 @@ Every screen above can be clicked through in the browser: [try the app online](h
 
 Settings → About → **Check for updates** opens the newest installer from GitHub; install it over the old copy. Every macOS build after 0.2.0 is signed with the same self-signed "Sayso Release" certificate, so an update keeps its Microphone, Accessibility and Input Monitoring grants (coming from 0.2.0 or earlier, grant them once more). Every push to `main` builds and publishes a new release automatically (`.github/workflows/release.yml`; the patch number counts up, `[skip release]` in the commit message skips it). Maintainers: the certificate lives in `~/.sayso-signing/`, never in the repo; local builds sign with `scripts/macos-signing.sh bun run tauri build`, and CI reads it from the `SAYSO_SIGNING_P12` / `SAYSO_SIGNING_P12_PASSWORD` secrets.
 
-### Upgrading from Voiceless
-
-The app used to be called Voiceless and stored its data under `com.voiceless.desktop`. On first launch Sayso moves that folder (settings, history, recordings and downloaded models) to `com.sayso.desktop`; nothing is lost and nothing needs re-downloading. macOS ties permissions to the app identity, so **Microphone**, **Accessibility** and **Input Monitoring** have to be granted once more.
-
 ## License
 
 MIT, see `LICENSE`. Third-party components and model weights: `THIRD_PARTY.md`.

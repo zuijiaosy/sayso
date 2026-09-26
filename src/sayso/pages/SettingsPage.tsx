@@ -60,7 +60,7 @@ const UpdateRow: React.FC<{ version: string }> = ({ version }) => {
   let action: React.ReactNode;
   if (state.status === "done" && state.info.newer) {
     const { info } = state;
-    description = t("voiceless.general.update.available", {
+    description = t("sayso.general.update.available", {
       version: info.version,
     });
     action = (
@@ -69,16 +69,16 @@ const UpdateRow: React.FC<{ version: string }> = ({ version }) => {
         size="sm"
         onClick={() => void openUrl(info.downloadUrl)}
       >
-        {t("voiceless.general.update.download")}
+        {t("sayso.general.update.download")}
       </Button>
     );
   } else {
     description =
       state.status === "done"
-        ? t("voiceless.general.update.latest")
+        ? t("sayso.general.update.latest")
         : state.status === "error"
-          ? t("voiceless.general.update.failed")
-          : t("voiceless.general.update.description");
+          ? t("sayso.general.update.failed")
+          : t("sayso.general.update.description");
     action = (
       <div className="flex flex-wrap justify-end gap-2">
         {state.status === "error" && (
@@ -87,7 +87,7 @@ const UpdateRow: React.FC<{ version: string }> = ({ version }) => {
             size="sm"
             onClick={() => void openUrl(RELEASES_URL)}
           >
-            {t("voiceless.general.update.openReleases")}
+            {t("sayso.general.update.openReleases")}
           </Button>
         )}
         <Button
@@ -97,15 +97,15 @@ const UpdateRow: React.FC<{ version: string }> = ({ version }) => {
           onClick={() => void check()}
         >
           {state.status === "checking"
-            ? t("voiceless.general.update.checking")
-            : t("voiceless.general.update.check")}
+            ? t("sayso.general.update.checking")
+            : t("sayso.general.update.check")}
         </Button>
       </div>
     );
   }
 
   return (
-    <Row title={t("voiceless.general.update.title")} description={description}>
+    <Row title={t("sayso.general.update.title")} description={description}>
       {action}
     </Row>
   );
@@ -136,25 +136,25 @@ export const SettingsPage: React.FC = () => {
   if (!settings) return null;
 
   return (
-    <Page title={t("voiceless.settings.title")}>
+    <Page title={t("sayso.settings.title")}>
       <TabbedSection<SettingsTab>
         value={tab}
         onChange={setTab}
         tabs={[
           {
             value: "general",
-            label: t("voiceless.general.title"),
+            label: t("sayso.general.title"),
             icon: <SlidersHorizontal size={20} />,
           },
           {
             value: "permissions",
-            label: t("voiceless.permissions.title"),
+            label: t("sayso.permissions.title"),
             icon: <Shield size={20} />,
-            description: t("voiceless.permissions.description"),
+            description: t("sayso.permissions.description"),
           },
           {
             value: "about",
-            label: t("voiceless.general.about"),
+            label: t("sayso.general.about"),
             icon: <Info size={20} />,
           },
         ]}
@@ -162,8 +162,8 @@ export const SettingsPage: React.FC = () => {
         {tab === "general" && (
           <>
             <Row
-              title={t("voiceless.general.autostart")}
-              description={t("voiceless.general.autostartDesc")}
+              title={t("sayso.general.autostart")}
+              description={t("sayso.general.autostartDesc")}
             >
               <Switch
                 checked={settings.autostart_enabled ?? false}
@@ -173,8 +173,8 @@ export const SettingsPage: React.FC = () => {
               />
             </Row>
             <Row
-              title={t("voiceless.general.targetLanguage")}
-              description={t("voiceless.general.targetLanguageDesc")}
+              title={t("sayso.general.targetLanguage")}
+              description={t("sayso.general.targetLanguageDesc")}
             >
               <SelectInput
                 value={settings.translate_target_language}
@@ -193,8 +193,8 @@ export const SettingsPage: React.FC = () => {
               </SelectInput>
             </Row>
             <Row
-              title={t("voiceless.general.microphone")}
-              description={t("voiceless.general.microphoneDesc")}
+              title={t("sayso.general.microphone")}
+              description={t("sayso.general.microphoneDesc")}
             >
               <SelectInput
                 value={settings.selected_microphone ?? "Default"}
@@ -209,7 +209,7 @@ export const SettingsPage: React.FC = () => {
                 ))}
               </SelectInput>
             </Row>
-            <Row title={t("voiceless.general.overlayPosition")}>
+            <Row title={t("sayso.general.overlayPosition")}>
               <SelectInput
                 value={settings.overlay_position}
                 onChange={(e) =>
@@ -220,14 +220,14 @@ export const SettingsPage: React.FC = () => {
                 }
               >
                 <option value="bottom">
-                  {t("voiceless.general.overlayBottom")}
+                  {t("sayso.general.overlayBottom")}
                 </option>
-                <option value="top">{t("voiceless.general.overlayTop")}</option>
+                <option value="top">{t("sayso.general.overlayTop")}</option>
               </SelectInput>
             </Row>
             <Row
-              title={t("voiceless.general.clipboard")}
-              description={t("voiceless.general.clipboardDesc")}
+              title={t("sayso.general.clipboard")}
+              description={t("sayso.general.clipboardDesc")}
             >
               <Switch
                 checked={settings.clipboard_handling === "copy_to_clipboard"}
@@ -239,7 +239,7 @@ export const SettingsPage: React.FC = () => {
                 }
               />
             </Row>
-            <Row title={t("voiceless.general.appearance")}>
+            <Row title={t("sayso.general.appearance")}>
               <Segmented<Theme>
                 value={settings.theme ?? "system"}
                 onChange={(value) => {
@@ -251,14 +251,14 @@ export const SettingsPage: React.FC = () => {
                 options={THEME_OPTIONS.map((option) => ({
                   value: option,
                   label: t(
-                    `voiceless.general.appearance${
+                    `sayso.general.appearance${
                       option.charAt(0).toUpperCase() + option.slice(1)
                     }`,
                   ),
                 }))}
               />
             </Row>
-            <Row title={t("voiceless.general.appLanguage")}>
+            <Row title={t("sayso.general.appLanguage")}>
               <SelectInput
                 value={settings.app_language}
                 onChange={(e) => {
@@ -284,14 +284,14 @@ export const SettingsPage: React.FC = () => {
               title={
                 <span className="flex items-center gap-2">
                   <Logo size={18} />
-                  {t("voiceless.appName")}
+                  {t("sayso.appName")}
                 </span>
               }
               description={
                 <>
-                  {t("voiceless.general.version", { version })}
+                  {t("sayso.general.version", { version })}
                   <br />
-                  {t("voiceless.general.basedOn")}
+                  {t("sayso.general.basedOn")}
                 </>
               }
             >
@@ -301,14 +301,14 @@ export const SettingsPage: React.FC = () => {
                   size="sm"
                   onClick={() => void commands.openLogDir()}
                 >
-                  {t("voiceless.general.openLogs")}
+                  {t("sayso.general.openLogs")}
                 </Button>
                 <Button
                   variant="danger-ghost"
                   size="sm"
                   onClick={() => void exit(0)}
                 >
-                  {t("voiceless.general.quit")}
+                  {t("sayso.general.quit")}
                 </Button>
               </div>
             </Row>

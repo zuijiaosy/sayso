@@ -92,8 +92,8 @@ ORT_LIB_LOCATION=$(brew --prefix onnxruntime)/lib ORT_PREFER_DYNAMIC_LINK=1 bun 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/zuijiaosy/voiceless.git
-cd voiceless
+git clone https://github.com/zuijiaosy/sayso.git
+cd sayso
 ```
 
 ### 2. Install Dependencies

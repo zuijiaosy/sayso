@@ -780,11 +780,11 @@ mod tests {
 
     /// Live check that the DeepSeek preset URL resolves to the chat endpoint
     /// (an invalid key must yield 401, not 404). Run with
-    /// `VOICELESS_LIVE_TESTS=1 cargo test --lib live_deepseek -- --ignored`.
+    /// `SAYSO_LIVE_TESTS=1 cargo test --lib live_deepseek -- --ignored`.
     #[test]
     #[ignore]
     fn live_deepseek_preset_reaches_chat_endpoint() {
-        if std::env::var("VOICELESS_LIVE_TESTS").ok().as_deref() != Some("1") {
+        if std::env::var("SAYSO_LIVE_TESTS").ok().as_deref() != Some("1") {
             return;
         }
         let provider = crate::settings::get_default_settings()
