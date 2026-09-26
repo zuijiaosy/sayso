@@ -51,7 +51,7 @@ _顺口一说，即刻上屏。_
 
 ### 更新
 
-设置 → 关于 →「检查更新」会打开 GitHub 上最新的安装包，下载后覆盖安装即可。0.2.0 之后的 macOS 版本都用同一张自签名证书「Sayso Release」签名，覆盖安装后麦克风、辅助功能、输入监控权限保持不变（从 0.2.0 及更早版本升级时需要重新授权一次）。维护者：证书放在 `~/.sayso-signing/`，不进仓库；本地构建用 `scripts/macos-signing.sh bun run tauri build` 签名，CI 从 `SAYSO_SIGNING_P12` / `SAYSO_SIGNING_P12_PASSWORD` 两个 Secret 读取。
+设置 → 关于 →「检查更新」会打开 GitHub 上最新的安装包，下载后覆盖安装即可。0.2.0 之后的 macOS 版本都用同一张自签名证书「Sayso Release」签名，覆盖安装后麦克风、辅助功能、输入监控权限保持不变（从 0.2.0 及更早版本升级时需要重新授权一次）。推送到 `main` 会自动打包并发布新版本（`.github/workflows/release.yml`，补丁号自动加一；提交信息里带 `[skip release]` 时不发布）。维护者：证书放在 `~/.sayso-signing/`，不进仓库；本地构建用 `scripts/macos-signing.sh bun run tauri build` 签名，CI 从 `SAYSO_SIGNING_P12` / `SAYSO_SIGNING_P12_PASSWORD` 两个 Secret 读取。
 
 ### 从 Voiceless 升级
 

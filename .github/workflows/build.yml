@@ -39,6 +39,12 @@ on:
         required: false
         type: boolean
         default: false
+      # Overrides the version in tauri.conf.json, package.json and Cargo.toml
+      # for this build; the release workflow computes it from git tags.
+      app-version:
+        required: false
+        type: string
+        default: ""
       repository:
         required: false
         type: string
@@ -84,6 +90,18 @@ jobs:
           repository: ${{ inputs.repository }}
           ref: ${{ inputs.ref }}
           fetch-depth: 0
+
+      - name: Set app version
+        if: inputs.app-version != ''
+        shell: bash
+        env:
+          V: ${{ inputs.app-version }}
+        run: |
+          perl -0pi -e 's/"version": "[^"]*"/"version": "$ENV{V}"/' src-tauri/tauri.conf.json package.json
+          perl -0pi -e 's/(\[package\]\r?\nname = "sayso"\r?\nversion = )"[^"]*"/$1"$ENV{V}"/' src-tauri/Cargo.toml
+          perl -0pi -e 's/(name = "sayso"\r?\nversion = )"[^"]*"/$1"$ENV{V}"/' src-tauri/Cargo.lock
+          grep -m1 '"version"' src-tauri/tauri.conf.json
+          grep -m1 '^version' src-tauri/Cargo.toml
 
       - name: Get version from tauri.conf.json
         id: get-version

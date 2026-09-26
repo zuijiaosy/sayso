@@ -51,7 +51,7 @@ Forked from [Handy](https://github.com/cjpais/Handy) (MIT). Recording, global ho
 
 ### Updating
 
-Settings → About → **Check for updates** opens the newest installer from GitHub; install it over the old copy. Every macOS build after 0.2.0 is signed with the same self-signed "Sayso Release" certificate, so an update keeps its Microphone, Accessibility and Input Monitoring grants (coming from 0.2.0 or earlier, grant them once more). Maintainers: the certificate lives in `~/.sayso-signing/`, never in the repo; local builds sign with `scripts/macos-signing.sh bun run tauri build`, and CI reads it from the `SAYSO_SIGNING_P12` / `SAYSO_SIGNING_P12_PASSWORD` secrets.
+Settings → About → **Check for updates** opens the newest installer from GitHub; install it over the old copy. Every macOS build after 0.2.0 is signed with the same self-signed "Sayso Release" certificate, so an update keeps its Microphone, Accessibility and Input Monitoring grants (coming from 0.2.0 or earlier, grant them once more). Every push to `main` builds and publishes a new release automatically (`.github/workflows/release.yml`; the patch number counts up, `[skip release]` in the commit message skips it). Maintainers: the certificate lives in `~/.sayso-signing/`, never in the repo; local builds sign with `scripts/macos-signing.sh bun run tauri build`, and CI reads it from the `SAYSO_SIGNING_P12` / `SAYSO_SIGNING_P12_PASSWORD` secrets.
 
 ### Upgrading from Voiceless
 
