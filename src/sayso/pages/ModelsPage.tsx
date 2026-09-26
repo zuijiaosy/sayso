@@ -75,9 +75,7 @@ export const importSenseVoiceFolder = async (
   if (!selected || Array.isArray(selected)) return false;
   const result = await commands.importSenseVoiceModel(selected);
   if (result.status === "error") {
-    toast.error(
-      t("sayso.models.local.importFailed", { error: result.error }),
-    );
+    toast.error(t("sayso.models.local.importFailed", { error: result.error }));
     return false;
   }
   toast.success(t("sayso.models.local.importOk"));
@@ -212,9 +210,7 @@ const LocalModels: React.FC = () => {
 
   return (
     <>
-      {visible.length === 0 && (
-        <Row title={t("sayso.models.local.empty")} />
-      )}
+      {visible.length === 0 && <Row title={t("sayso.models.local.empty")} />}
       {visible.map((model) => (
         <ModelRow
           key={model.id}
@@ -486,9 +482,7 @@ const CloudAsrBody: React.FC = () => {
     if (result.status === "ok") {
       toast.success(t("sayso.models.cloud.testOk", { ms: result.data }));
     } else {
-      toast.error(
-        t("sayso.models.cloud.testFailed", { error: result.error }),
-      );
+      toast.error(t("sayso.models.cloud.testFailed", { error: result.error }));
     }
   };
 
@@ -586,21 +580,16 @@ const TextModelBody: React.FC = () => {
     setTesting(true);
     const result = await commands.testTextModel();
     setTesting(false);
-    if (result.status === "ok")
-      toast.success(t("sayso.models.text.testOk"));
+    if (result.status === "ok") toast.success(t("sayso.models.text.testOk"));
     else
-      toast.error(
-        t("sayso.models.text.testFailed", { error: result.error }),
-      );
+      toast.error(t("sayso.models.text.testFailed", { error: result.error }));
   };
 
   return (
     <>
       {!configured && (
         <div className="pt-4">
-          <Notice tone="info">
-            {t("sayso.models.text.notConfigured")}
-          </Notice>
+          <Notice tone="info">{t("sayso.models.text.notConfigured")}</Notice>
         </div>
       )}
       <Row

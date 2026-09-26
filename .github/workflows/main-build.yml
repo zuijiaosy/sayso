@@ -8,8 +8,7 @@ name: "Main Branch Build"
 # Apple/Azure secrets consumed by build.yml when sign-binaries is true.
 
 on:
-  push:
-    branches: [main]
+  # Manual only: release.yml already builds every push to main.
   workflow_dispatch:
 
 concurrency:

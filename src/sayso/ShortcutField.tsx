@@ -48,9 +48,7 @@ function useShortcutRecorder() {
       try {
         await updateBinding(recordingId, keys);
       } catch (error) {
-        toast.error(
-          t("sayso.shortcuts.errors.set", { error: String(error) }),
-        );
+        toast.error(t("sayso.shortcuts.errors.set", { error: String(error) }));
         await refreshSettings();
       }
       await stop();
@@ -106,9 +104,7 @@ function useShortcutRecorder() {
             },
           });
         } else {
-          toast.error(
-            t("sayso.shortcuts.errors.set", { error: result.error }),
-          );
+          toast.error(t("sayso.shortcuts.errors.set", { error: result.error }));
         }
         return;
       }

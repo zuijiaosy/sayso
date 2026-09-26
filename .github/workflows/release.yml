@@ -1,6 +1,7 @@
 name: "Release"
 
-# Every push to main builds macOS ARM64 and Windows x64 installers and publishes
+# Every push to main runs the code-quality checks and Rust tests, then builds
+# macOS ARM64 and Windows x64 installers and publishes
 # them as a GitHub release, with notes listing the commits since the previous
 # release (scripts/release-notes.sh). Put "[skip release]" in the commit
 # message to push without releasing; workflow_dispatch releases on demand.
@@ -34,8 +35,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  create-release:
+  # The checks that used to run as their own workflows on every push. Nothing
+  # is built or published unless they pass.
+  code-quality:
     if: ${{ !contains(github.event.head_commit.message, '[skip release]') }}
+    uses: ./.github/workflows/code-quality.yml
+
+  rust-tests:
+    if: ${{ !contains(github.event.head_commit.message, '[skip release]') }}
+    uses: ./.github/workflows/test.yml
+
+  create-release:
+    needs: [code-quality, rust-tests]
     permissions:
       contents: write
     runs-on: ubuntu-latest

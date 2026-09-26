@@ -1,20 +1,9 @@
 name: "code quality"
 on:
+  # Runs on pull requests, and on every push to main as the first stage of
+  # release.yml (workflow_call), so a push starts one workflow, not several.
+  workflow_call:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "src-tauri/src/catalog/catalog.json"
-      - "scripts/**"
-      - "package.json"
-      - "bun.lock"
-      - ".eslintrc*"
-      - "eslint.config.*"
-      - ".prettierrc*"
-      - "tsconfig*"
-      - "tailwind.config.*"
-      - ".github/workflows/**"
   pull_request:
     paths:
       - "src/**"
@@ -30,7 +19,7 @@ on:
       - ".github/workflows/**"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: code-quality-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:

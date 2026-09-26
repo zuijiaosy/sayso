@@ -76,9 +76,7 @@ const RouteRows: React.FC<{ route: Route; kind: ProviderKind }> = ({
       {kind === "asr" && (
         <DetailRow label={t("sayso.history.route")}>
           <Chip tone={isLocal ? "neutral" : "accent"}>
-            {isLocal
-              ? t("sayso.history.local")
-              : t("sayso.history.cloud")}
+            {isLocal ? t("sayso.history.local") : t("sayso.history.cloud")}
           </Chip>
         </DetailRow>
       )}
@@ -165,8 +163,7 @@ export const HistoryDetailsModal: React.FC<{
             {t("sayso.history.rawTranscript")}
           </div>
           <p className="mt-1 text-[13px] leading-relaxed whitespace-pre-wrap break-words">
-            {entry.transcription_text.trim() ||
-              t("sayso.history.emptyText")}
+            {entry.transcription_text.trim() || t("sayso.history.emptyText")}
           </p>
         </div>
         {showInserted && (

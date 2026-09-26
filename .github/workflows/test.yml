@@ -1,16 +1,15 @@
 name: "test"
 on:
+  # Runs on pull requests, and on every push to main as the first stage of
+  # release.yml (workflow_call), so a push starts one workflow, not several.
+  workflow_call:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "src-tauri/**"
   pull_request:
     paths:
       - "src-tauri/**"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: rust-tests-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:

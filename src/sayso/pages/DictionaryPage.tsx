@@ -123,9 +123,7 @@ export const DictionaryPage: React.FC = () => {
     await refreshSettings();
     setImportOpen(false);
     setImportText("");
-    toast.success(
-      t("sayso.dictionary.imported", { count: entries.length }),
-    );
+    toast.success(t("sayso.dictionary.imported", { count: entries.length }));
   };
 
   const exportText = async () => {

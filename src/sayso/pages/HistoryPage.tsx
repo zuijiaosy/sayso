@@ -124,9 +124,7 @@ const EntryRow: React.FC<{ entry: HistoryEntry; showMode: boolean }> = ({
         {text.trim() ? (
           <span className="select-text">{text}</span>
         ) : (
-          <span className="text-muted italic">
-            {t("sayso.history.failed")}
-          </span>
+          <span className="text-muted italic">{t("sayso.history.failed")}</span>
         )}
         {showMode && entry.mode === "translate" && (
           <span className="ms-2 align-middle">
@@ -310,9 +308,7 @@ export const HistoryPage: React.FC = () => {
         <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-5 -mx-1 px-1">
           {groups.length === 0 && !loading && (
             <p className="py-8 text-center text-[13px] text-muted">
-              {search
-                ? t("sayso.history.noResults")
-                : t("sayso.history.empty")}
+              {search ? t("sayso.history.noResults") : t("sayso.history.empty")}
             </p>
           )}
 
