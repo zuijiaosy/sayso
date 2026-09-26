@@ -307,7 +307,18 @@
       "version": "Version {{version}}",
       "basedOn": "Based on the open-source Handy project (MIT).",
       "openLogs": "Open logs folder",
-      "quit": "Quit Sayso"
+      "quit": "Quit Sayso",
+      "update": {
+        "title": "Updates",
+        "description": "Checks GitHub for the latest release.",
+        "check": "Check for updates",
+        "checking": "Checking…",
+        "latest": "You're on the latest version.",
+        "available": "Version {{version}} is available. Install it over this one; settings and permissions carry over.",
+        "download": "Download update",
+        "failed": "Couldn't reach GitHub. Try again later.",
+        "openReleases": "Open releases page"
+      }
     },
     "permissions": {
       "title": "Permissions",

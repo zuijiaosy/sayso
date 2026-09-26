@@ -49,6 +49,10 @@ _顺口一说，即刻上屏。_
 5. 选识别方式：下载 Qwen3-ASR 0.6B（约 811 MB）、导入已有的 sherpa-onnx SenseVoice int8 文件夹，或者走云端。
 6. 要整理或翻译的话，在「模型 → 文本模型」填 API Key，点「测试」。
 
+### 更新
+
+设置 → 关于 →「检查更新」会打开 GitHub 上最新的安装包，下载后覆盖安装即可。0.2.0 之后的 macOS 版本都用同一张自签名证书「Sayso Release」签名，覆盖安装后麦克风、辅助功能、输入监控权限保持不变（从 0.2.0 及更早版本升级时需要重新授权一次）。维护者：证书放在 `~/.sayso-signing/`，不进仓库；本地构建用 `scripts/macos-signing.sh bun run tauri build` 签名，CI 从 `SAYSO_SIGNING_P12` / `SAYSO_SIGNING_P12_PASSWORD` 两个 Secret 读取。
+
 ### 从 Voiceless 升级
 
 这个应用原来叫 Voiceless，数据存在 `com.voiceless.desktop`。首次启动时 Sayso 会把那个目录（设置、历史、录音和已下载的模型）整体搬到 `com.sayso.desktop`，不会丢东西，模型也不用重新下。macOS 的权限是跟应用身份绑定的，所以 **麦克风**、**辅助功能**、**输入监控** 需要重新授权一次。

@@ -32,6 +32,13 @@ on:
         required: false
         type: boolean
         default: false
+      # Sign macOS builds with the shared self-signed "Sayso Release"
+      # certificate (secrets SAYSO_SIGNING_P12 / SAYSO_SIGNING_P12_PASSWORD),
+      # so an update keeps its macOS permissions. See scripts/macos-signing.sh.
+      self-sign-macos:
+        required: false
+        type: boolean
+        default: false
       repository:
         required: false
         type: string
@@ -241,6 +248,21 @@ jobs:
           CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
           echo "CERT_ID=$CERT_ID" >> $GITHUB_ENV
           echo "Certificate imported."
+
+      - name: Import Sayso Release certificate (macOS)
+        if: contains(inputs.platform, 'macos') && inputs.self-sign-macos
+        env:
+          SAYSO_SIGNING_P12: ${{ secrets.SAYSO_SIGNING_P12 }}
+          SIGNING_P12_PASSWORD: ${{ secrets.SAYSO_SIGNING_P12_PASSWORD }}
+        run: |
+          # An ad-hoc build would cost every user their permissions on update,
+          # so refuse to ship one.
+          if [ -z "$SAYSO_SIGNING_P12" ]; then
+            echo "::error::Secret SAYSO_SIGNING_P12 is missing; see scripts/macos-signing.sh"
+            exit 1
+          fi
+          echo "$SAYSO_SIGNING_P12" | base64 --decode > "$RUNNER_TEMP/sayso.p12"
+          SIGNING_P12="$RUNNER_TEMP/sayso.p12" scripts/macos-signing.sh --github-env
 
       - name: Patch asset name pattern
         id: patch-release-name
@@ -588,6 +610,15 @@ jobs:
       # tauri-action uploads release assets before returning. All AppImage
       # filtering therefore happens inside linuxdeploy above; this verifies the
       # exact artifact Tauri signed and uploaded.
+      - name: Verify Sayso Release signature (macOS)
+        if: contains(inputs.platform, 'macos') && inputs.self-sign-macos
+        run: |
+          APP="$(find "src-tauri/target/${{ inputs.target }}/${{ steps.build-profile.outputs.profile }}/bundle/macos" -maxdepth 1 -name '*.app' -print -quit)"
+          codesign --verify --strict "$APP"
+          codesign -dvv "$APP" 2>&1 | grep -q '^Authority=Sayso Release$' \
+            || { echo "::error::$APP is not signed with the Sayso Release certificate"; exit 1; }
+          codesign -d -r- "$APP" 2>&1 | grep designated
+
       - name: Verify AppImage version metadata
         if: contains(inputs.platform, 'ubuntu')
         shell: bash

@@ -7,9 +7,13 @@ name: "Release"
 # published. A failed build leaves a draft behind instead of a public release
 # with missing downloads.
 #
-# Binaries are unsigned, matching main-build.yml: the repository has no
-# Apple/Azure signing secrets, and build.yml fails at the certificate import
-# when sign-binaries is true without them.
+# No Apple/Azure signing: the repository has no such secrets, and build.yml
+# fails at the certificate import when sign-binaries is true without them.
+# macOS builds are instead signed with the self-signed "Sayso Release"
+# certificate (self-sign-macos, secrets SAYSO_SIGNING_P12 and
+# SAYSO_SIGNING_P12_PASSWORD), so every release carries the same signature and
+# installs over the previous one without losing permissions. They are still
+# not notarized.
 
 on: workflow_dispatch
 
@@ -85,6 +89,7 @@ jobs:
       target: ${{ matrix.target }}
       build-args: ${{ matrix.args }}
       sign-binaries: false
+      self-sign-macos: true
       asset-prefix: "sayso"
       upload-artifacts: false
       release-id: ${{ needs.create-release.outputs.release-id }}
@@ -124,6 +129,7 @@ jobs:
               "",
               "- **macOS**：把 `Sayso.app` 拖进「应用程序」，确认下载来自本仓库后，在终端执行 `xattr -cr /Applications/Sayso.app`，再打开。首次运行按提示授予**麦克风**、**辅助功能**、**输入监控**权限；并在 系统设置 → 键盘 → 「按下 🌐 键时」选择**不执行任何操作**。",
               "- **Windows**：没有 Authenticode 签名，首次运行 SmartScreen 会拦截，点「更多信息」→「仍要运行」。",
+              "- **更新**：在 设置 → 关于 里点「检查更新」，下载新版后直接覆盖安装。0.2.0 之后的版本都用同一张证书签名，覆盖后权限保持不变；从 0.2.0 及更早版本升级时需要重新授权一次。",
               "- **从 Voiceless 升级**：首次启动会把 `com.voiceless.desktop` 的设置、历史、录音和已下载模型迁移到 `com.sayso.desktop`，无需重新下载；macOS 权限需要重新授予一次。",
               "",
               "## Install notes",
@@ -132,6 +138,7 @@ jobs:
               "",
               "- **macOS**: move `Sayso.app` to Applications, confirm the download came from this repository, run `xattr -cr /Applications/Sayso.app`, then open it. Grant **Microphone**, **Accessibility** and **Input Monitoring** when asked, and set System Settings → Keyboard → \"Press 🌐 key to\" → **Do Nothing**.",
               "- **Windows**: there is no Authenticode signature, so SmartScreen warns on first run — choose \"More info\" → \"Run anyway\".",
+              "- **Updating**: Settings → About → Check for updates, then install the new build over the old one. Every release after 0.2.0 is signed with the same certificate, so permissions carry over; upgrading from 0.2.0 or earlier needs them granted once more.",
               "- **Upgrading from Voiceless**: on first launch settings, history, recordings and downloaded models move from `com.voiceless.desktop` to `com.sayso.desktop`; macOS permissions must be granted once more.",
             ].join("\n");
 
@@ -144,28 +151,3 @@ jobs:
               make_latest: "true",
             });
             core.notice(`Published ${release.tag_name}`);
-
-  notify-website:
-    name: "Refresh website"
-    needs: publish-release
-    runs-on: ubuntu-latest
-    steps:
-      # Tells the website repository to rebuild, so its version number and
-      # download links point at the release that was just published. Needs a
-      # SITE_DISPATCH_TOKEN secret (fine-grained PAT with "Contents: write" on
-      # the website repo); without it this step is skipped and the site's
-      # daily rebuild picks the release up instead.
-      - name: Dispatch sayso-release
-        env:
-          TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
-          SITE_REPO: ${{ vars.SITE_REPO || 'zuijiaosy/sayso-web' }}
-        run: |
-          if [ -z "$TOKEN" ]; then
-            echo "::notice::SITE_DISPATCH_TOKEN not set; the website refreshes on its daily schedule"
-            exit 0
-          fi
-          curl -fsS -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $TOKEN" \
-            "https://api.github.com/repos/$SITE_REPO/dispatches" \
-            -d '{"event_type":"sayso-release"}'

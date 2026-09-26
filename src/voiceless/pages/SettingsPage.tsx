@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getVersion } from "@tauri-apps/api/app";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { exit } from "@tauri-apps/plugin-process";
 import { Info, Shield, SlidersHorizontal } from "lucide-react";
 import { commands, type Theme, type TranslateTarget } from "@/bindings";
 import { Button } from "@/components/ui/Button";
 import { useSettings } from "@/hooks/useSettings";
 import { SUPPORTED_LANGUAGES } from "@/i18n";
+import { RELEASES_URL, checkForUpdate, type UpdateInfo } from "@/lib/updates";
 import { THEME_OPTIONS, applyTheme } from "@/lib/utils/theme";
 import {
   Page,
@@ -31,6 +33,82 @@ export const languageLabel = (code: string, uiLanguage: string) => {
   } catch {
     return code;
   }
+};
+
+type UpdateState =
+  | { status: "idle" | "checking" | "error" }
+  | { status: "done"; info: UpdateInfo };
+
+/**
+ * Manual "check for updates" in About. Nothing is downloaded or installed in
+ * the app: a newer release opens its installer in the browser.
+ */
+const UpdateRow: React.FC<{ version: string }> = ({ version }) => {
+  const { t } = useTranslation();
+  const [state, setState] = useState<UpdateState>({ status: "idle" });
+
+  const check = async () => {
+    setState({ status: "checking" });
+    try {
+      setState({ status: "done", info: await checkForUpdate(version) });
+    } catch {
+      setState({ status: "error" });
+    }
+  };
+
+  let description: string;
+  let action: React.ReactNode;
+  if (state.status === "done" && state.info.newer) {
+    const { info } = state;
+    description = t("voiceless.general.update.available", {
+      version: info.version,
+    });
+    action = (
+      <Button
+        variant="primary"
+        size="sm"
+        onClick={() => void openUrl(info.downloadUrl)}
+      >
+        {t("voiceless.general.update.download")}
+      </Button>
+    );
+  } else {
+    description =
+      state.status === "done"
+        ? t("voiceless.general.update.latest")
+        : state.status === "error"
+          ? t("voiceless.general.update.failed")
+          : t("voiceless.general.update.description");
+    action = (
+      <div className="flex flex-wrap justify-end gap-2">
+        {state.status === "error" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void openUrl(RELEASES_URL)}
+          >
+            {t("voiceless.general.update.openReleases")}
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={!version || state.status === "checking"}
+          onClick={() => void check()}
+        >
+          {state.status === "checking"
+            ? t("voiceless.general.update.checking")
+            : t("voiceless.general.update.check")}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <Row title={t("voiceless.general.update.title")} description={description}>
+      {action}
+    </Row>
+  );
 };
 
 /** General preferences, permissions and About, reached from the sidebar's
@@ -201,38 +279,41 @@ export const SettingsPage: React.FC = () => {
         {tab === "permissions" && <PermissionsBody />}
 
         {tab === "about" && (
-          <Row
-            title={
-              <span className="flex items-center gap-2">
-                <Logo size={18} />
-                {t("voiceless.appName")}
-              </span>
-            }
-            description={
-              <>
-                {t("voiceless.general.version", { version })}
-                <br />
-                {t("voiceless.general.basedOn")}
-              </>
-            }
-          >
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => void commands.openLogDir()}
-              >
-                {t("voiceless.general.openLogs")}
-              </Button>
-              <Button
-                variant="danger-ghost"
-                size="sm"
-                onClick={() => void exit(0)}
-              >
-                {t("voiceless.general.quit")}
-              </Button>
-            </div>
-          </Row>
+          <>
+            <Row
+              title={
+                <span className="flex items-center gap-2">
+                  <Logo size={18} />
+                  {t("voiceless.appName")}
+                </span>
+              }
+              description={
+                <>
+                  {t("voiceless.general.version", { version })}
+                  <br />
+                  {t("voiceless.general.basedOn")}
+                </>
+              }
+            >
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void commands.openLogDir()}
+                >
+                  {t("voiceless.general.openLogs")}
+                </Button>
+                <Button
+                  variant="danger-ghost"
+                  size="sm"
+                  onClick={() => void exit(0)}
+                >
+                  {t("voiceless.general.quit")}
+                </Button>
+              </div>
+            </Row>
+            <UpdateRow version={version} />
+          </>
         )}
       </TabbedSection>
     </Page>
