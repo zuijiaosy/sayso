@@ -415,7 +415,11 @@ pub(crate) async fn process_transcription_output(
 
     match mode {
         SessionMode::Dictate => {
-            let kind = PromptKind::Dictate(settings.dictation_post_mode);
+            let post_mode = settings.dictation_post_mode;
+            let kind = PromptKind::Dictate(
+                post_mode,
+                crate::voice::custom_dictation_prompt(&settings, post_mode),
+            );
             let Some(system_prompt) =
                 crate::voice::build_system_prompt(&kind, &settings.dictionary, &text)
             else {

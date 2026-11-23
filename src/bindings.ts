@@ -715,6 +715,22 @@ async testTextModel() : Promise<Result<string, string>> {
 async updateDictationPostMode(mode: DictationPostMode) : Promise<void> {
     await TAURI_INVOKE("update_dictation_post_mode", { mode });
 },
+async getDefaultDictationPrompts() : Promise<DefaultDictationPrompts> {
+    return await TAURI_INVOKE("get_default_dictation_prompts");
+},
+/**
+ * Set (or clear with `None`) the user's instruction for a dictation mode. A
+ * blank prompt, or one identical to the built-in text, is stored as `None` so
+ * future improvements to the default still reach the user.
+ */
+async updateDictationPrompt(mode: DictationPostMode, prompt: string | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_dictation_prompt", { mode, prompt }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * Replace the whole dictionary. Entries are trimmed, blank terms dropped, and
  * aliases de-duplicated.
@@ -1218,6 +1234,16 @@ overlay_style?: OverlayStyle;
  */
 dictation_post_mode?: DictationPostMode; 
 /**
+ * Sayso: user-edited instruction for the "fix" mode; `None` uses the
+ * built-in one. Guardrails, dictionary hints and the output rule are
+ * always appended, so this only replaces the task description.
+ */
+dictation_fix_prompt?: string | null; 
+/**
+ * Sayso: user-edited instruction for the "polish" mode (see above).
+ */
+dictation_polish_prompt?: string | null; 
+/**
  * Sayso: BCP 47 code of the translation target, e.g. `en-US`.
  */
 translate_target_language?: string; 
@@ -1302,6 +1328,11 @@ language: string;
  * Send dictionary terms as recognition context.
  */
 send_dictionary: boolean }
+/**
+ * Built-in instructions for the dictation modes, shown as the starting point
+ * (and the "reset" target) in the prompt editor.
+ */
+export type DefaultDictationPrompts = { fix: string; polish: string }
 /**
  * What the text model does to a dictation (translation always uses the model).
  */

@@ -639,6 +639,14 @@ pub struct AppSettings {
     /// Sayso: how dictation text is post-processed by the text model.
     #[serde(default)]
     pub dictation_post_mode: DictationPostMode,
+    /// Sayso: user-edited instruction for the "fix" mode; `None` uses the
+    /// built-in one. Guardrails, dictionary hints and the output rule are
+    /// always appended, so this only replaces the task description.
+    #[serde(default)]
+    pub dictation_fix_prompt: Option<String>,
+    /// Sayso: user-edited instruction for the "polish" mode (see above).
+    #[serde(default)]
+    pub dictation_polish_prompt: Option<String>,
     /// Sayso: BCP 47 code of the translation target, e.g. `en-US`.
     #[serde(default = "default_translate_target_language")]
     pub translate_target_language: String,
@@ -1154,6 +1162,8 @@ pub fn get_default_settings() -> AppSettings {
         vad_backend: VadBackend::default(),
         overlay_style: default_overlay_style(),
         dictation_post_mode: DictationPostMode::default(),
+        dictation_fix_prompt: None,
+        dictation_polish_prompt: None,
         translate_target_language: default_translate_target_language(),
         dictionary: Vec::new(),
         asr_provider: AsrProviderKind::default(),

@@ -746,6 +746,8 @@ pub fn run(cli_args: CliArgs) {
             commands::voice::complete_onboarding,
             commands::voice::test_text_model,
             commands::voice::update_dictation_post_mode,
+            commands::voice::get_default_dictation_prompts,
+            commands::voice::update_dictation_prompt,
             commands::voice::update_dictionary,
             commands::get_app_dir_path,
             commands::get_app_settings,

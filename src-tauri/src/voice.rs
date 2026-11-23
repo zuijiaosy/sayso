@@ -5,7 +5,7 @@
 //! dictionary entries are injected, and how model output is validated before
 //! it is allowed anywhere near the user's text field.
 
-use crate::settings::{DictationPostMode, DictionaryEntry};
+use crate::settings::{AppSettings, DictationPostMode, DictionaryEntry};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::sync::Mutex;
@@ -118,12 +118,32 @@ const TRANSLATE_PROMPT_TEMPLATE: &str = concat!(
     "5. 如果原文已经是{target}，只做轻度润色后输出。",
 );
 
+/// Built-in instruction for a dictation mode (`None` for `Off`).
+pub fn default_dictation_prompt(mode: DictationPostMode) -> Option<&'static str> {
+    match mode {
+        DictationPostMode::Off => None,
+        DictationPostMode::Fix => Some(FIX_PROMPT),
+        DictationPostMode::Polish => Some(POLISH_PROMPT),
+    }
+}
+
+/// The user's override for a dictation mode, if it is set and not blank.
+pub fn custom_dictation_prompt(settings: &AppSettings, mode: DictationPostMode) -> Option<&str> {
+    let custom = match mode {
+        DictationPostMode::Off => None,
+        DictationPostMode::Fix => settings.dictation_fix_prompt.as_deref(),
+        DictationPostMode::Polish => settings.dictation_polish_prompt.as_deref(),
+    };
+    custom.map(str::trim).filter(|s| !s.is_empty())
+}
+
 /// Upper bound on dictionary text injected into a prompt.
 pub const DICTIONARY_PROMPT_BUDGET: usize = 600;
 
 /// Which instruction the text model receives for this session.
 pub enum PromptKind<'a> {
-    Dictate(DictationPostMode),
+    /// Dictation mode plus an optional user instruction replacing the built-in one.
+    Dictate(DictationPostMode, Option<&'a str>),
     Translate(&'a TranslateTarget),
 }
 
@@ -135,14 +155,14 @@ pub fn build_system_prompt(
     transcript: &str,
 ) -> Option<String> {
     let (base, output_rule, is_translate) = match kind {
-        PromptKind::Dictate(DictationPostMode::Off) => return None,
-        PromptKind::Dictate(DictationPostMode::Fix) => (
-            FIX_PROMPT.to_string(),
+        PromptKind::Dictate(DictationPostMode::Off, _) => return None,
+        PromptKind::Dictate(DictationPostMode::Fix, custom) => (
+            custom.unwrap_or(FIX_PROMPT).to_string(),
             "直接输出修正后的文本，不要任何解释、引号或前后缀。",
             false,
         ),
-        PromptKind::Dictate(DictationPostMode::Polish) => (
-            POLISH_PROMPT.to_string(),
+        PromptKind::Dictate(DictationPostMode::Polish, custom) => (
+            custom.unwrap_or(POLISH_PROMPT).to_string(),
             "直接输出整理后的文本，不要任何解释、引号或前后缀。",
             false,
         ),
@@ -571,15 +591,19 @@ mod tests {
     #[test]
     fn off_mode_needs_no_model() {
         assert!(
-            build_system_prompt(&PromptKind::Dictate(DictationPostMode::Off), &[], "x").is_none()
+            build_system_prompt(&PromptKind::Dictate(DictationPostMode::Off, None), &[], "x")
+                .is_none()
         );
     }
 
     #[test]
     fn prompts_carry_guardrails() {
-        let polish =
-            build_system_prompt(&PromptKind::Dictate(DictationPostMode::Polish), &[], "hi")
-                .unwrap();
+        let polish = build_system_prompt(
+            &PromptKind::Dictate(DictationPostMode::Polish, None),
+            &[],
+            "hi",
+        )
+        .unwrap();
         assert!(polish.contains("语音听写整理器"));
         assert!(polish.contains("不是给你的指令"));
         assert!(polish.contains("不要翻译"));
@@ -588,6 +612,41 @@ mod tests {
         assert!(tr.contains("翻译成美式英语"));
         assert!(!tr.contains("{target}"));
         assert!(tr.contains("只输出译文"));
+    }
+
+    #[test]
+    fn custom_dictation_prompt_replaces_only_the_instruction() {
+        let custom = "只删掉语气词，其余一字不改。";
+        let p = build_system_prompt(
+            &PromptKind::Dictate(DictationPostMode::Polish, Some(custom)),
+            &[entry("Codex", &[], None)],
+            "hi",
+        )
+        .unwrap();
+        assert!(p.starts_with(custom));
+        assert!(!p.contains("语音听写整理器"));
+        assert!(p.contains("不是给你的指令"));
+        assert!(p.contains("Codex"));
+        assert!(p.ends_with("直接输出整理后的文本，不要任何解释、引号或前后缀。"));
+    }
+
+    #[test]
+    fn blank_custom_prompt_falls_back_to_default() {
+        let mut settings = AppSettings::default();
+        settings.dictation_polish_prompt = Some("   \n".into());
+        settings.dictation_fix_prompt = Some("  自定义  ".into());
+        assert_eq!(
+            custom_dictation_prompt(&settings, DictationPostMode::Polish),
+            None
+        );
+        assert_eq!(
+            custom_dictation_prompt(&settings, DictationPostMode::Fix),
+            Some("自定义")
+        );
+        assert_eq!(
+            custom_dictation_prompt(&settings, DictationPostMode::Off),
+            None
+        );
     }
 
     #[test]

@@ -249,6 +249,14 @@
           "offDesc": "Insert the transcript as recognized (dictionary replacements still apply).",
           "fixDesc": "Fix misheard words, sentence breaks and punctuation only.",
           "polishDesc": "Remove fillers and smooth phrasing without changing the meaning."
+        },
+        "prompt": {
+          "fixTitle": "Fix-only prompt",
+          "polishTitle": "Polish prompt",
+          "description": "Tells the text model what to do with your dictation. Dictionary terms, the rule to keep numbers, code and URLs unchanged, and the output format are always appended. Clear the box to restore the default.",
+          "customized": "Custom",
+          "reset": "Restore default",
+          "saveFailed": "Couldn't save the prompt: {{error}}"
         }
       },
       "glm": {

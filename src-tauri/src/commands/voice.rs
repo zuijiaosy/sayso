@@ -156,6 +156,48 @@ pub fn update_dictation_post_mode(app: AppHandle, mode: DictationPostMode) {
     write_settings(&app, settings);
 }
 
+/// Built-in instructions for the dictation modes, shown as the starting point
+/// (and the "reset" target) in the prompt editor.
+#[derive(Serialize, Type)]
+pub struct DefaultDictationPrompts {
+    pub fix: String,
+    pub polish: String,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_default_dictation_prompts() -> DefaultDictationPrompts {
+    DefaultDictationPrompts {
+        fix: crate::voice::FIX_PROMPT.to_string(),
+        polish: crate::voice::POLISH_PROMPT.to_string(),
+    }
+}
+
+/// Set (or clear with `None`) the user's instruction for a dictation mode. A
+/// blank prompt, or one identical to the built-in text, is stored as `None` so
+/// future improvements to the default still reach the user.
+#[tauri::command]
+#[specta::specta]
+pub fn update_dictation_prompt(
+    app: AppHandle,
+    mode: DictationPostMode,
+    prompt: Option<String>,
+) -> Result<(), String> {
+    let default = crate::voice::default_dictation_prompt(mode)
+        .ok_or_else(|| "The \"off\" mode has no prompt".to_string())?;
+    let prompt = prompt
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty() && p != default.trim());
+    let mut settings = get_settings(&app);
+    match mode {
+        DictationPostMode::Fix => settings.dictation_fix_prompt = prompt,
+        DictationPostMode::Polish => settings.dictation_polish_prompt = prompt,
+        DictationPostMode::Off => unreachable!("rejected above"),
+    }
+    write_settings(&app, settings);
+    Ok(())
+}
+
 /// Replace the whole dictionary. Entries are trimmed, blank terms dropped, and
 /// aliases de-duplicated.
 #[tauri::command]

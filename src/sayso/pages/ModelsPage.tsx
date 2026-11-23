@@ -2,7 +2,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
-import { AudioLines, FolderOpen, RefreshCw, Sparkles } from "lucide-react";
+import {
+  AudioLines,
+  FolderOpen,
+  RefreshCw,
+  RotateCcw,
+  Sparkles,
+} from "lucide-react";
 import {
   commands,
   type AsrProviderKind,
@@ -10,6 +16,7 @@ import {
   type DashScopeAsrSettings,
   type GlmAsrSettings,
   type StepFunAsrSettings,
+  type DefaultDictationPrompts,
   type DictationPostMode,
   type ModelInfo,
 } from "@/bindings";
@@ -539,6 +546,82 @@ const CloudAsrBody: React.FC = () => {
   );
 };
 
+/**
+ * Editor for the instruction a dictation mode sends to the text model. Shows
+ * the built-in prompt until the user changes it; saving the default text (or
+ * clearing the box) stores nothing, so the user keeps getting future defaults.
+ */
+const DictationPromptEditor: React.FC<{ mode: "fix" | "polish" }> = ({
+  mode,
+}) => {
+  const { t } = useTranslation();
+  const { settings, refreshSettings } = useSettings();
+  const [defaults, setDefaults] = useState<DefaultDictationPrompts | null>(
+    null,
+  );
+  useEffect(() => {
+    void commands.getDefaultDictationPrompts().then(setDefaults);
+  }, []);
+
+  const raw =
+    mode === "fix"
+      ? settings?.dictation_fix_prompt
+      : settings?.dictation_polish_prompt;
+  const stored = raw?.trim() ? raw : null;
+  const fallback = defaults?.[mode] ?? "";
+  const current = stored ?? fallback;
+  const [draft, setDraft] = useState(current);
+  useEffect(() => setDraft(current), [current]);
+
+  const save = async (value: string | null) => {
+    const result = await commands.updateDictationPrompt(mode, value);
+    if (result.status === "error")
+      toast.error(
+        t("sayso.models.text.prompt.saveFailed", { error: result.error }),
+      );
+    await refreshSettings();
+  };
+
+  const reset = () => {
+    setDraft(fallback);
+    void save(null);
+  };
+
+  return (
+    <Row
+      title={
+        <span className="inline-flex items-center gap-2">
+          {t(`sayso.models.text.prompt.${mode}Title`)}
+          {stored && <Chip>{t("sayso.models.text.prompt.customized")}</Chip>}
+        </span>
+      }
+      description={t("sayso.models.text.prompt.description")}
+      stacked
+    >
+      <div className="flex flex-col gap-2">
+        <textarea
+          className="w-full min-w-0 min-h-36 p-3 text-sm leading-relaxed rounded-control border border-border bg-surface focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+          value={draft}
+          spellCheck={false}
+          disabled={!defaults}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            if (draft.trim() !== current.trim()) void save(draft);
+          }}
+        />
+        {stored && (
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onClick={reset}>
+              <RotateCcw size={14} />
+              {t("sayso.models.text.prompt.reset")}
+            </Button>
+          </div>
+        )}
+      </div>
+    </Row>
+  );
+};
+
 const TextModelBody: React.FC = () => {
   const { t } = useTranslation();
   const {
@@ -699,6 +782,7 @@ const TextModelBody: React.FC = () => {
           ]}
         />
       </Row>
+      {mode !== "off" && <DictationPromptEditor key={mode} mode={mode} />}
     </>
   );
 };
