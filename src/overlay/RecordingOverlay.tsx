@@ -254,6 +254,13 @@ const RecordingOverlay: React.FC = () => {
 
   return (
     <div className="vl-stage">
+      {mode === "scene" && (
+        <div className="vl-translate">
+          <div className="vl-translate-row vl-scene-row">
+            <span className="vl-scene-label">{t("overlay.scene")}</span>
+          </div>
+        </div>
+      )}
       {mode === "translate" && (
         <div className="vl-translate">
           {pickerOpen && (

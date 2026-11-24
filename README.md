@@ -38,15 +38,16 @@ Every screen above can be clicked through in the browser: [try the app online](h
 
 ## Features
 
-| Feature     | Notes                                                                                                                                                                                |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Dictation   | `Fn`. Tap to start, tap to stop. Or hold to talk, release to finish.                                                                                                                 |
-| Translation | `Fn + Left Shift`. Target language switches from the overlay. Hold Fn then add Left Shift to turn a running dictation into a translation.                                            |
-| Overlay     | Black pill at the bottom of the screen: ✕ cancel, live waveform, ✓ done. Never takes focus from the field you are typing into.                                                       |
-| Recognition | Local Qwen3-ASR 0.6B (offline, 30 languages, auto language detect). SenseVoice still available. Cloud: StepFun `stepaudio-2.5-asr`, Alibaba `qwen3-asr-flash`, Zhipu `glm-asr-2512`. |
-| Text model  | DeepSeek `deepseek-flash` (thinking off), Alibaba Cloud, or any OpenAI-compatible endpoint.                                                                                          |
-| Cleanup     | Off / fix only / polish (default).                                                                                                                                                   |
-| Dictionary  | Preferred spellings, common misrecognitions, fixed translations, notes. Import and export as text.                                                                                   |
+| Feature         | Notes                                                                                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Dictation       | `Fn`. Tap to start, tap to stop. Or hold to talk, release to finish.                                                                                                                 |
+| Translation     | `Fn + Left Shift`. Target language switches from the overlay. Hold Fn then add Left Shift to turn a running dictation into a translation.                                            |
+| Scene dictation | `Fn + Left Option`. Cleans up with your own scene prompt (e.g. customer replies), separate from everyday dictation. Hold Fn then add Left Option to switch a running dictation.      |
+| Overlay         | Black pill at the bottom of the screen: ✕ cancel, live waveform, ✓ done. Never takes focus from the field you are typing into.                                                       |
+| Recognition     | Local Qwen3-ASR 0.6B (offline, 30 languages, auto language detect). SenseVoice still available. Cloud: StepFun `stepaudio-2.5-asr`, Alibaba `qwen3-asr-flash`, Zhipu `glm-asr-2512`. |
+| Text model      | DeepSeek `deepseek-flash` (thinking off), Alibaba Cloud, or any OpenAI-compatible endpoint.                                                                                          |
+| Cleanup         | Off / fix only / polish (default). Each prompt, and the scene prompt, can be edited under Models → Text model.                                                                       |
+| Dictionary      | Preferred spellings, common misrecognitions, fixed translations, notes. Import and export as text.                                                                                   |
 
 ## Where your data goes
 

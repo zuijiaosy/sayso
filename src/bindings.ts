@@ -719,17 +719,12 @@ async getDefaultDictationPrompts() : Promise<DefaultDictationPrompts> {
     return await TAURI_INVOKE("get_default_dictation_prompts");
 },
 /**
- * Set (or clear with `None`) the user's instruction for a dictation mode. A
- * blank prompt, or one identical to the built-in text, is stored as `None` so
- * future improvements to the default still reach the user.
+ * Set (or clear with `None`) one of the user's prompts. A blank prompt, or
+ * one identical to the built-in text, is stored as `None` so future
+ * improvements to the default still reach the user.
  */
-async updateDictationPrompt(mode: DictationPostMode, prompt: string | null) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("update_dictation_prompt", { mode, prompt }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
+async updateDictationPrompt(which: EditablePrompt, prompt: string | null) : Promise<void> {
+    await TAURI_INVOKE("update_dictation_prompt", { which, prompt });
 },
 /**
  * Replace the whole dictionary. Entries are trimmed, blank terms dropped, and
@@ -829,6 +824,22 @@ async initializeEnigo() : Promise<Result<null, string>> {
 async initializeShortcuts() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("initialize_shortcuts") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Clears Sayso's macOS grant for `permission` before asking for it. A grant is
+ * tied to the app's code signature, so after an update with a different
+ * signature (0.2.x builds were ad-hoc signed) the old entry stays in System
+ * Settings without matching the new build: macOS neither honors it nor asks
+ * again. Only called while the permission reads as not granted, so there is
+ * no working grant to lose. Ported from upstream Handy (#2057).
+ */
+async resetMacosPermission(permission: MacPermission) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reset_macos_permission", { permission }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1244,6 +1255,11 @@ dictation_fix_prompt?: string | null;
  */
 dictation_polish_prompt?: string | null; 
 /**
+ * Sayso: the scene shortcut's prompt (e.g. customer-service replies);
+ * `None` uses the polish prompt. Guardrails are appended as above.
+ */
+scene_prompt?: string | null; 
+/**
  * Sayso: BCP 47 code of the translation target, e.g. `en-US`.
  */
 translate_target_language?: string; 
@@ -1329,10 +1345,10 @@ language: string;
  */
 send_dictionary: boolean }
 /**
- * Built-in instructions for the dictation modes, shown as the starting point
+ * Built-in instructions for the editable prompts, shown as the starting point
  * (and the "reset" target) in the prompt editor.
  */
-export type DefaultDictationPrompts = { fix: string; polish: string }
+export type DefaultDictationPrompts = { fix: string; polish: string; scene: string }
 /**
  * What the text model does to a dictation (translation always uses the model).
  */
@@ -1369,6 +1385,11 @@ translation?: string | null;
  * Short hint that helps the text model understand the term.
  */
 note?: string | null }
+/**
+ * A prompt the user can edit: the everyday dictation's two cleanup levels,
+ * and the scene shortcut's prompt.
+ */
+export type EditablePrompt = "fix" | "polish" | "scene"
 export type EngineType = 
 /**
  * Any GGML/GGUF model loaded through transcribe-cpp (Whisper, Parakeet,
@@ -1454,6 +1475,10 @@ export type LlmTrace = {
  */
 provider: string; model: string | null; usage: TokenUsage | null; ms: number | null }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
+/**
+ * A macOS privacy permission Sayso asks for.
+ */
+export type MacPermission = "accessibility" | "microphone" | "input_monitoring"
 export type ModelInfo = { id: string; name: string; description: string; filename: string; source: ModelSource; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean; supports_streaming: boolean; supports_language_detection: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
 /**
@@ -1529,9 +1554,18 @@ uncovered_bindings: string[];
  */
 recorder_blocked: boolean }
 /**
- * The two things a recording can turn into.
+ * What a recording turns into.
  */
-export type SessionMode = "dictate" | "translate"
+export type SessionMode = 
+/**
+ * Everyday dictation, cleaned up per `dictation_post_mode`.
+ */
+"dictate" | "translate" | 
+/**
+ * Dictation rewritten with the user's own scene prompt (e.g. replies to
+ * customers), on its own shortcut so everyday dictation stays light.
+ */
+"scene"
 /**
  * Mode and target for the session currently recording (or last started).
  */

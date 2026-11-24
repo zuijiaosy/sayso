@@ -199,7 +199,9 @@ pub struct UsageDay {
 
 fn mode_to_str(mode: SessionMode) -> &'static str {
     match mode {
-        SessionMode::Dictate => "dictate",
+        // A scene dictation is still a dictation for history and usage; its
+        // saved prompt shows which one ran.
+        SessionMode::Dictate | SessionMode::Scene => "dictate",
         SessionMode::Translate => "translate",
     }
 }
@@ -551,7 +553,9 @@ impl HistoryManager {
             post_processed_text: new.post_processed_text,
             post_process_prompt: new.post_process_prompt,
             post_process_requested: new.post_process_requested,
-            mode: new.mode,
+            // As stored, so live updates match what a reload returns (a scene
+            // dictation is listed as a dictation).
+            mode: mode_from_str(mode_to_str(new.mode)),
             audio_ms: new.audio_ms,
             asr: new.asr,
             llm: new.llm,

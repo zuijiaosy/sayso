@@ -18,6 +18,7 @@ import {
   type StepFunAsrSettings,
   type DefaultDictationPrompts,
   type DictationPostMode,
+  type EditablePrompt,
   type ModelInfo,
 } from "@/bindings";
 import { Button } from "@/components/ui/Button";
@@ -547,12 +548,13 @@ const CloudAsrBody: React.FC = () => {
 };
 
 /**
- * Editor for the instruction a dictation mode sends to the text model. Shows
- * the built-in prompt until the user changes it; saving the default text (or
- * clearing the box) stores nothing, so the user keeps getting future defaults.
+ * Editor for an instruction sent to the text model: the everyday dictation's
+ * cleanup level, or the scene shortcut's prompt. Shows the built-in prompt
+ * until the user changes it; saving the default text (or clearing the box)
+ * stores nothing, so the user keeps getting future defaults.
  */
-const DictationPromptEditor: React.FC<{ mode: "fix" | "polish" }> = ({
-  mode,
+const DictationPromptEditor: React.FC<{ which: EditablePrompt }> = ({
+  which,
 }) => {
   const { t } = useTranslation();
   const { settings, refreshSettings } = useSettings();
@@ -563,22 +565,25 @@ const DictationPromptEditor: React.FC<{ mode: "fix" | "polish" }> = ({
     void commands.getDefaultDictationPrompts().then(setDefaults);
   }, []);
 
-  const raw =
-    mode === "fix"
-      ? settings?.dictation_fix_prompt
-      : settings?.dictation_polish_prompt;
+  const raw = {
+    fix: settings?.dictation_fix_prompt,
+    polish: settings?.dictation_polish_prompt,
+    scene: settings?.scene_prompt,
+  }[which];
   const stored = raw?.trim() ? raw : null;
-  const fallback = defaults?.[mode] ?? "";
+  const fallback = defaults?.[which] ?? "";
   const current = stored ?? fallback;
   const [draft, setDraft] = useState(current);
   useEffect(() => setDraft(current), [current]);
 
   const save = async (value: string | null) => {
-    const result = await commands.updateDictationPrompt(mode, value);
-    if (result.status === "error")
+    try {
+      await commands.updateDictationPrompt(which, value);
+    } catch (error) {
       toast.error(
-        t("sayso.models.text.prompt.saveFailed", { error: result.error }),
+        t("sayso.models.text.prompt.saveFailed", { error: String(error) }),
       );
+    }
     await refreshSettings();
   };
 
@@ -591,11 +596,15 @@ const DictationPromptEditor: React.FC<{ mode: "fix" | "polish" }> = ({
     <Row
       title={
         <span className="inline-flex items-center gap-2">
-          {t(`sayso.models.text.prompt.${mode}Title`)}
+          {t(`sayso.models.text.prompt.${which}Title`)}
           {stored && <Chip>{t("sayso.models.text.prompt.customized")}</Chip>}
         </span>
       }
-      description={t("sayso.models.text.prompt.description")}
+      description={t(
+        which === "scene"
+          ? "sayso.models.text.prompt.sceneDescription"
+          : "sayso.models.text.prompt.description",
+      )}
       stacked
     >
       <div className="flex flex-col gap-2">
@@ -782,7 +791,8 @@ const TextModelBody: React.FC = () => {
           ]}
         />
       </Row>
-      {mode !== "off" && <DictationPromptEditor key={mode} mode={mode} />}
+      {mode !== "off" && <DictationPromptEditor key={mode} which={mode} />}
+      <DictationPromptEditor which="scene" />
     </>
   );
 };

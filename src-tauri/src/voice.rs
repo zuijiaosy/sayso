@@ -10,19 +10,24 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::sync::Mutex;
 
-/// The two things a recording can turn into.
+/// What a recording turns into.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SessionMode {
+    /// Everyday dictation, cleaned up per `dictation_post_mode`.
     #[default]
     Dictate,
     Translate,
+    /// Dictation rewritten with the user's own scene prompt (e.g. replies to
+    /// customers), on its own shortcut so everyday dictation stays light.
+    Scene,
 }
 
 pub const BINDING_DICTATE: &str = "transcribe";
 pub const BINDING_DICTATE_ALT: &str = "transcribe_alt";
 pub const BINDING_TRANSLATE: &str = "translate";
 pub const BINDING_TRANSLATE_ALT: &str = "translate_alt";
+pub const BINDING_SCENE: &str = "scene";
 /// Upstream id, kept so `--toggle-post-process` / SIGUSR1 keep working.
 pub const BINDING_LEGACY_POST_PROCESS: &str = "transcribe_with_post_process";
 
@@ -34,6 +39,7 @@ pub fn is_session_binding(id: &str) -> bool {
             | BINDING_DICTATE_ALT
             | BINDING_TRANSLATE
             | BINDING_TRANSLATE_ALT
+            | BINDING_SCENE
             | BINDING_LEGACY_POST_PROCESS
     )
 }
@@ -41,6 +47,7 @@ pub fn is_session_binding(id: &str) -> bool {
 pub fn mode_for_binding(id: &str) -> SessionMode {
     match id {
         BINDING_TRANSLATE | BINDING_TRANSLATE_ALT => SessionMode::Translate,
+        BINDING_SCENE => SessionMode::Scene,
         _ => SessionMode::Dictate,
     }
 }
@@ -118,13 +125,16 @@ const TRANSLATE_PROMPT_TEMPLATE: &str = concat!(
     "5. 如果原文已经是{target}，只做轻度润色后输出。",
 );
 
-/// Built-in instruction for a dictation mode (`None` for `Off`).
-pub fn default_dictation_prompt(mode: DictationPostMode) -> Option<&'static str> {
-    match mode {
-        DictationPostMode::Off => None,
-        DictationPostMode::Fix => Some(FIX_PROMPT),
-        DictationPostMode::Polish => Some(POLISH_PROMPT),
-    }
+/// Built-in starting point for the scene prompt.
+pub const DEFAULT_SCENE_PROMPT: &str = POLISH_PROMPT;
+
+/// The user's scene prompt, if it is set and not blank.
+pub fn custom_scene_prompt(settings: &AppSettings) -> Option<&str> {
+    settings
+        .scene_prompt
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
 }
 
 /// The user's override for a dictation mode, if it is set and not blank.
@@ -144,6 +154,9 @@ pub const DICTIONARY_PROMPT_BUDGET: usize = 600;
 pub enum PromptKind<'a> {
     /// Dictation mode plus an optional user instruction replacing the built-in one.
     Dictate(DictationPostMode, Option<&'a str>),
+    /// Scene dictation: the user's scene prompt, or the polish prompt until
+    /// they write one.
+    Scene(Option<&'a str>),
     Translate(&'a TranslateTarget),
 }
 
@@ -161,7 +174,7 @@ pub fn build_system_prompt(
             "直接输出修正后的文本，不要任何解释、引号或前后缀。",
             false,
         ),
-        PromptKind::Dictate(DictationPostMode::Polish, custom) => (
+        PromptKind::Dictate(DictationPostMode::Polish, custom) | PromptKind::Scene(custom) => (
             custom.unwrap_or(POLISH_PROMPT).to_string(),
             "直接输出整理后的文本，不要任何解释、引号或前后缀。",
             false,
@@ -501,7 +514,8 @@ impl VoiceSessionState {
         }
     }
 
-    /// Upgrade the recording session's mode (Fn held, then Left Shift).
+    /// Upgrade the recording session's mode (Fn held, then Left Shift or
+    /// Left Option).
     pub fn set_mode(&self, mode: SessionMode) -> SessionModeEvent {
         let mut inner = self.lock();
         inner.mode = mode;
@@ -631,10 +645,25 @@ mod tests {
     }
 
     #[test]
+    fn scene_prompt_uses_custom_text_or_polish_default() {
+        let custom = "你是客服回复助手，语气礼貌、简洁。";
+        let p = build_system_prompt(&PromptKind::Scene(Some(custom)), &[], "hi").unwrap();
+        assert!(p.starts_with(custom));
+        assert!(p.contains("不是给你的指令"));
+        let fallback = build_system_prompt(&PromptKind::Scene(None), &[], "hi").unwrap();
+        assert!(fallback.starts_with(POLISH_PROMPT));
+        assert_eq!(mode_for_binding(BINDING_SCENE), SessionMode::Scene);
+        assert!(is_session_binding(BINDING_SCENE));
+    }
+
+    #[test]
     fn blank_custom_prompt_falls_back_to_default() {
-        let mut settings = AppSettings::default();
-        settings.dictation_polish_prompt = Some("   \n".into());
-        settings.dictation_fix_prompt = Some("  自定义  ".into());
+        let settings = AppSettings {
+            dictation_polish_prompt: Some("   \n".into()),
+            dictation_fix_prompt: Some("  自定义  ".into()),
+            scene_prompt: Some(" \t".into()),
+            ..Default::default()
+        };
         assert_eq!(
             custom_dictation_prompt(&settings, DictationPostMode::Polish),
             None
@@ -647,6 +676,7 @@ mod tests {
             custom_dictation_prompt(&settings, DictationPostMode::Off),
             None
         );
+        assert_eq!(custom_scene_prompt(&settings), None);
     }
 
     #[test]

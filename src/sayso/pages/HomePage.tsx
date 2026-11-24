@@ -151,7 +151,8 @@ export const HomePage: React.FC = () => {
 
   const anyFn =
     usesFn(settings?.bindings?.transcribe?.current_binding) ||
-    usesFn(settings?.bindings?.translate?.current_binding);
+    usesFn(settings?.bindings?.translate?.current_binding) ||
+    usesFn(settings?.bindings?.scene?.current_binding);
 
   return (
     <Page title={t("sayso.nav.home")}>
@@ -169,6 +170,12 @@ export const HomePage: React.FC = () => {
           description={t("sayso.shortcuts.translate.description")}
         >
           <ShortcutField bindingId="translate" />
+        </Row>
+        <Row
+          title={t("sayso.shortcuts.scene.title")}
+          description={t("sayso.shortcuts.scene.description")}
+        >
+          <ShortcutField bindingId="scene" />
         </Row>
         <Row
           title={t("sayso.shortcuts.activation.title")}

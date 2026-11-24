@@ -140,16 +140,19 @@ export const PermissionRows: React.FC<{ state: PermissionState }> = ({
   const rows = [
     {
       key: "microphone" as const,
+      tcc: "microphone" as const,
       request: requestMicrophonePermission,
       pane: "microphone",
     },
     {
       key: "accessibility" as const,
+      tcc: "accessibility" as const,
       request: requestAccessibilityPermission,
       pane: "accessibility",
     },
     {
       key: "inputMonitoring" as const,
+      tcc: "input_monitoring" as const,
       request: requestInputMonitoringPermission,
       pane: "input_monitoring",
     },
@@ -174,6 +177,13 @@ export const PermissionRows: React.FC<{ state: PermissionState }> = ({
                   size="sm"
                   onClick={async () => {
                     try {
+                      // A grant made for an earlier build's signature lingers
+                      // in System Settings but no longer counts, and macOS
+                      // won't ask again until it is cleared. Only once the
+                      // check has said "not granted": while it is still
+                      // unknown, clearing could remove a working grant.
+                      if (granted === false)
+                        await commands.resetMacosPermission(row.tcc);
                       await row.request();
                     } catch {
                       // Fall back to the System Settings pane below.

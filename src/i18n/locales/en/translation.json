@@ -32,6 +32,7 @@
     "processing": "Polishing…",
     "translating": "Translating…",
     "translateTo": "Translate to",
+    "scene": "Scene dictation",
     "cancel": "Cancel",
     "confirm": "Finish",
     "translateFailed": "Translation failed",
@@ -99,6 +100,10 @@
         "title": "Translate",
         "description": "Press to start and stop translation."
       },
+      "scene": {
+        "title": "Scene dictation",
+        "description": "Dictate and clean up with your own scene prompt, e.g. for customer replies. Edit the prompt under Models → Text model."
+      },
       "pressKeys": "Press keys…",
       "reset": "Reset",
       "activation": {
@@ -108,7 +113,7 @@
         "toggle": "Tap to toggle only",
         "push_to_talk": "Hold to talk only"
       },
-      "tips": "While recording: press Esc or click ✕ to cancel, click ✓ to finish. Holding Fn and then pressing Left Shift switches the current dictation to translation.",
+      "tips": "While recording: press Esc or click ✕ to cancel, click ✓ to finish. Holding Fn and then pressing Left Shift switches the current dictation to translation; pressing Left Option instead switches it to scene dictation.",
       "fnHardware": "Fn only works on Apple keyboards. Choose a different shortcut if you use a third-party keyboard.",
       "fnWarning": {
         "title": "The Fn key conflicts with a system setting",
@@ -256,7 +261,9 @@
           "description": "Tells the text model what to do with your dictation. Dictionary terms, the rule to keep numbers, code and URLs unchanged, and the output format are always appended. Clear the box to restore the default.",
           "customized": "Custom",
           "reset": "Restore default",
-          "saveFailed": "Couldn't save the prompt: {{error}}"
+          "saveFailed": "Couldn't save the prompt: {{error}}",
+          "sceneTitle": "Scene prompt",
+          "sceneDescription": "Used only by the Scene dictation shortcut, whatever the cleanup level above. Write what a specific situation needs, e.g. the tone and wording of customer replies. Dictionary terms, the rule to keep numbers, code and URLs unchanged, and the output format are still appended. Clear the box to restore the default (the same as Polish)."
         }
       },
       "glm": {

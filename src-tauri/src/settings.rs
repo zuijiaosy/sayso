@@ -647,6 +647,10 @@ pub struct AppSettings {
     /// Sayso: user-edited instruction for the "polish" mode (see above).
     #[serde(default)]
     pub dictation_polish_prompt: Option<String>,
+    /// Sayso: the scene shortcut's prompt (e.g. customer-service replies);
+    /// `None` uses the polish prompt. Guardrails are appended as above.
+    #[serde(default)]
+    pub scene_prompt: Option<String>,
     /// Sayso: BCP 47 code of the translation target, e.g. `en-US`.
     #[serde(default = "default_translate_target_language")]
     pub translate_target_language: String,
@@ -1039,18 +1043,36 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
 
 pub const SETTINGS_STORE_PATH: &str = "settings_store.json";
 
+/// Whether two stored shortcut strings name the same key combination
+/// (`option_left+fn` and `fn+alt_left` do). Unset shortcuts never collide.
+fn shortcuts_collide(a: &str, b: &str) -> bool {
+    let (a, b) = (a.trim(), b.trim());
+    if a.is_empty() || b.is_empty() {
+        return false;
+    }
+    match (
+        a.parse::<handy_keys::Hotkey>(),
+        b.parse::<handy_keys::Hotkey>(),
+    ) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => a.eq_ignore_ascii_case(b),
+    }
+}
+
 pub fn get_default_settings() -> AppSettings {
-    // Sayso defaults: Fn dictates, Fn + Left Shift translates (Apple
-    // keyboards only; see README). The `_alt` bindings are optional second
-    // shortcuts ("add another") and start unset.
+    // Sayso defaults: Fn dictates, Fn + Left Shift translates, Fn + Left
+    // Option dictates with the scene prompt (Apple keyboards only; see
+    // README). The `_alt` bindings are optional second shortcuts and start
+    // unset.
     #[cfg(target_os = "macos")]
-    let (default_dictate, default_translate) = ("fn", "fn+shift_left");
-    #[cfg(target_os = "windows")]
-    let (default_dictate, default_translate) = ("ctrl+space", "ctrl+shift+space");
-    #[cfg(target_os = "linux")]
-    let (default_dictate, default_translate) = ("ctrl+space", "ctrl+shift+space");
+    let (default_dictate, default_translate, default_scene) =
+        ("fn", "fn+shift_left", "fn+alt_left");
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    let (default_dictate, default_translate, default_scene) =
+        ("ctrl+space", "ctrl+shift+space", "ctrl+alt+space");
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    let (default_dictate, default_translate) = ("alt+space", "alt+shift+space");
+    let (default_dictate, default_translate, default_scene) =
+        ("alt+space", "alt+shift+space", "alt+ctrl+space");
 
     let mut bindings = HashMap::new();
     let mut add = |id: &str, name: &str, description: &str, binding: &str| {
@@ -1088,6 +1110,12 @@ pub fn get_default_settings() -> AppSettings {
         "Translate (another shortcut)",
         "An optional second shortcut for translation.",
         "",
+    );
+    add(
+        crate::voice::BINDING_SCENE,
+        "Scene dictation",
+        "Press to dictate with your scene prompt.",
+        default_scene,
     );
     add(
         "cancel",
@@ -1164,6 +1192,7 @@ pub fn get_default_settings() -> AppSettings {
         dictation_post_mode: DictationPostMode::default(),
         dictation_fix_prompt: None,
         dictation_polish_prompt: None,
+        scene_prompt: None,
         translate_target_language: default_translate_target_language(),
         dictionary: Vec::new(),
         asr_provider: AsrProviderKind::default(),
@@ -1234,13 +1263,27 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
             updated = true;
         }
 
-        // Merge in any bindings added since this store was written.
-        for (key, value) in get_default_settings().bindings {
-            if let std::collections::hash_map::Entry::Vacant(entry) = settings.bindings.entry(key) {
-                debug!("Adding missing binding: {}", entry.key());
-                entry.insert(value);
-                updated = true;
+        // Merge in any bindings added since this store was written. A new
+        // default that the user already uses for another binding starts
+        // unset rather than taking that shortcut over.
+        for (key, mut value) in get_default_settings().bindings {
+            if settings.bindings.contains_key(&key) {
+                continue;
             }
+            if settings
+                .bindings
+                .values()
+                .any(|b| shortcuts_collide(&b.current_binding, &value.current_binding))
+            {
+                warn!(
+                    "New binding '{key}' would reuse '{}', already in use; leaving it unset",
+                    value.current_binding
+                );
+                value.current_binding = String::new();
+            }
+            debug!("Adding missing binding: {key}");
+            settings.bindings.insert(key, value);
+            updated = true;
         }
 
         if updated {
@@ -1514,6 +1557,15 @@ pub fn get_recording_retention_period(app: &AppHandle) -> RecordingRetentionPeri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shortcuts_collide_by_key_combination_not_spelling() {
+        assert!(shortcuts_collide("option_left+fn", "fn+alt_left"));
+        assert!(shortcuts_collide("ctrl+alt+space", "alt+ctrl+space"));
+        assert!(!shortcuts_collide("fn+shift_left", "fn+alt_left"));
+        assert!(!shortcuts_collide("", ""));
+        assert!(!shortcuts_collide("fn", ""));
+    }
 
     fn default_settings_json() -> serde_json::Value {
         serde_json::to_value(get_default_settings()).unwrap()

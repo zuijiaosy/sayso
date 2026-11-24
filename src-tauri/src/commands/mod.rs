@@ -206,3 +206,47 @@ pub fn initialize_shortcuts(app: AppHandle) -> Result<(), String> {
     log::info!("Shortcuts initialized successfully");
     Ok(())
 }
+
+/// A macOS privacy permission Sayso asks for.
+#[derive(Clone, Copy, Debug, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum MacPermission {
+    Accessibility,
+    Microphone,
+    InputMonitoring,
+}
+
+/// Clears Sayso's macOS grant for `permission` before asking for it. A grant is
+/// tied to the app's code signature, so after an update with a different
+/// signature (0.2.x builds were ad-hoc signed) the old entry stays in System
+/// Settings without matching the new build: macOS neither honors it nor asks
+/// again. Only called while the permission reads as not granted, so there is
+/// no working grant to lose. Ported from upstream Handy (#2057).
+#[tauri::command]
+#[specta::specta]
+pub fn reset_macos_permission(app: AppHandle, permission: MacPermission) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let service = match permission {
+            MacPermission::Accessibility => "Accessibility",
+            MacPermission::Microphone => "Microphone",
+            MacPermission::InputMonitoring => "ListenEvent",
+        };
+        let identifier = app.config().identifier.clone();
+        let output = std::process::Command::new("/usr/bin/tccutil")
+            .args(["reset", service, &identifier])
+            .output()
+            .map_err(|e| format!("Failed to run tccutil: {e}"))?;
+        if !output.status.success() {
+            // Asking is still worth trying: on a first install there may be
+            // nothing to reset.
+            log::warn!(
+                "tccutil reset {service} failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            );
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, permission);
+    Ok(())
+}

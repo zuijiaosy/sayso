@@ -54,7 +54,8 @@ const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
 
 // Sayso layouts (logical points; keep in sync with RecordingOverlay.css).
-// Translate mode stacks the "Translate to" row above the capsule; opening the
+// Translate mode stacks the "Translate to" row above the capsule (scene
+// dictation stacks its label row the same way); opening the
 // language list needs room for the list; a translation failure shows the
 // source text with retry / copy actions.
 const OVERLAY_TRANSLATE_WIDTH: f64 = 320.0;
@@ -63,6 +64,8 @@ const OVERLAY_PICKER_HEIGHT: f64 = 380.0;
 const OVERLAY_FAILURE_WIDTH: f64 = 380.0;
 const OVERLAY_FAILURE_HEIGHT: f64 = 132.0;
 
+/// A row sits above the capsule: translate's "Translate to", or the scene
+/// dictation label.
 static OVERLAY_TRANSLATE_MODE: AtomicBool = AtomicBool::new(false);
 static OVERLAY_PICKER_OPEN: AtomicBool = AtomicBool::new(false);
 static OVERLAY_LAST_STATE: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
@@ -91,11 +94,12 @@ fn overlay_dimensions(state: &str) -> (f64, f64) {
 }
 
 /// Record the session mode for overlay sizing and, if the overlay is showing,
-/// resize it in place (Fn held, then Left Shift).
+/// resize it in place (Fn held, then Left Shift or Left Option).
 pub fn set_overlay_session_mode(app_handle: &AppHandle, mode: crate::voice::SessionMode) {
-    let translate = mode == crate::voice::SessionMode::Translate;
-    let changed = OVERLAY_TRANSLATE_MODE.swap(translate, Ordering::SeqCst) != translate;
-    if !translate {
+    use crate::voice::SessionMode;
+    let has_row = matches!(mode, SessionMode::Translate | SessionMode::Scene);
+    let changed = OVERLAY_TRANSLATE_MODE.swap(has_row, Ordering::SeqCst) != has_row;
+    if mode != SessionMode::Translate {
         OVERLAY_PICKER_OPEN.store(false, Ordering::SeqCst);
     }
     if changed {

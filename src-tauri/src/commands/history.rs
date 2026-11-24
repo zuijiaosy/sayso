@@ -140,7 +140,7 @@ pub async fn retry_history_entry_transcription(
         };
     asr.ms = Some(elapsed_ms(started));
 
-    if transcription.is_empty() {
+    if crate::actions::is_blank_transcription(&transcription) {
         return Err("Recording contains no speech".to_string());
     }
 

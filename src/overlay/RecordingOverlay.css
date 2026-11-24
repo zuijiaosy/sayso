@@ -189,6 +189,14 @@ body,
   box-sizing: border-box;
   max-width: 308px;
 }
+.vl-scene-row {
+  padding: 0 14px;
+}
+.vl-scene-label {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
 .vl-translate-label {
   font-size: 13px;
   color: var(--vl-muted);

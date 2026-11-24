@@ -1,6 +1,6 @@
 //! Commands for Sayso dictate / translate sessions.
 
-use crate::actions::{paste_and_finish, run_text_model, show_translation_failure};
+use crate::actions::{paste_and_finish, run_text_model, show_translation_failure, PasteOwner};
 use crate::settings::{
     get_settings, write_settings, AsrProviderKind, CloudAsrProvider, DashScopeAsrSettings,
     DictationPostMode, DictionaryEntry, GlmAsrSettings, StepFunAsrSettings,
@@ -12,7 +12,7 @@ use crate::voice::{
     SessionModeEvent, TranslateTarget, VoiceSessionState,
 };
 use crate::TranscriptionCoordinator;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -83,6 +83,9 @@ pub async fn retry_failed_translation(app: AppHandle) -> Result<(), String> {
         return Err("Nothing to retry".to_string());
     };
     state.clear_failed(None);
+    // Before the request: a recording started while it runs must not have
+    // its overlay reset, or its target app used, by this paste.
+    let owner = PasteOwner::capture(&app);
 
     let settings = get_settings(&app);
     let target = find_translate_target(&failure.target_language)
@@ -99,7 +102,7 @@ pub async fn retry_failed_translation(app: AppHandle) -> Result<(), String> {
 
     match run_text_model(&settings, &system_prompt, &failure.source_text).await {
         Ok(translated) => {
-            paste_and_finish(&app, translated.text, None);
+            paste_and_finish(&app, translated.text, None, owner);
             Ok(())
         }
         Err(err) => {
@@ -156,12 +159,13 @@ pub fn update_dictation_post_mode(app: AppHandle, mode: DictationPostMode) {
     write_settings(&app, settings);
 }
 
-/// Built-in instructions for the dictation modes, shown as the starting point
+/// Built-in instructions for the editable prompts, shown as the starting point
 /// (and the "reset" target) in the prompt editor.
 #[derive(Serialize, Type)]
 pub struct DefaultDictationPrompts {
     pub fix: String,
     pub polish: String,
+    pub scene: String,
 }
 
 #[tauri::command]
@@ -170,32 +174,41 @@ pub fn get_default_dictation_prompts() -> DefaultDictationPrompts {
     DefaultDictationPrompts {
         fix: crate::voice::FIX_PROMPT.to_string(),
         polish: crate::voice::POLISH_PROMPT.to_string(),
+        scene: crate::voice::DEFAULT_SCENE_PROMPT.to_string(),
     }
 }
 
-/// Set (or clear with `None`) the user's instruction for a dictation mode. A
-/// blank prompt, or one identical to the built-in text, is stored as `None` so
-/// future improvements to the default still reach the user.
+/// A prompt the user can edit: the everyday dictation's two cleanup levels,
+/// and the scene shortcut's prompt.
+#[derive(Deserialize, Type, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EditablePrompt {
+    Fix,
+    Polish,
+    Scene,
+}
+
+/// Set (or clear with `None`) one of the user's prompts. A blank prompt, or
+/// one identical to the built-in text, is stored as `None` so future
+/// improvements to the default still reach the user.
 #[tauri::command]
 #[specta::specta]
-pub fn update_dictation_prompt(
-    app: AppHandle,
-    mode: DictationPostMode,
-    prompt: Option<String>,
-) -> Result<(), String> {
-    let default = crate::voice::default_dictation_prompt(mode)
-        .ok_or_else(|| "The \"off\" mode has no prompt".to_string())?;
+pub fn update_dictation_prompt(app: AppHandle, which: EditablePrompt, prompt: Option<String>) {
+    let default = match which {
+        EditablePrompt::Fix => crate::voice::FIX_PROMPT,
+        EditablePrompt::Polish => crate::voice::POLISH_PROMPT,
+        EditablePrompt::Scene => crate::voice::DEFAULT_SCENE_PROMPT,
+    };
     let prompt = prompt
         .map(|p| p.trim().to_string())
         .filter(|p| !p.is_empty() && p != default.trim());
     let mut settings = get_settings(&app);
-    match mode {
-        DictationPostMode::Fix => settings.dictation_fix_prompt = prompt,
-        DictationPostMode::Polish => settings.dictation_polish_prompt = prompt,
-        DictationPostMode::Off => unreachable!("rejected above"),
+    match which {
+        EditablePrompt::Fix => settings.dictation_fix_prompt = prompt,
+        EditablePrompt::Polish => settings.dictation_polish_prompt = prompt,
+        EditablePrompt::Scene => settings.scene_prompt = prompt,
     }
     write_settings(&app, settings);
-    Ok(())
 }
 
 /// Replace the whole dictionary. Entries are trimmed, blank terms dropped, and

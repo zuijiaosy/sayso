@@ -23,11 +23,34 @@ use log::{debug, error, warn};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::future::Future;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::Manager;
 use tauri::{AppHandle, Emitter};
 use tauri_specta::Event as _;
+
+/// Bumped each time a recording session takes over the tray and overlay. A
+/// paste still finishing for an earlier session compares against it so its
+/// cleanup doesn't hide the new session's overlay or reset its tray icon.
+static RECORDING_SESSION: AtomicU64 = AtomicU64::new(0);
+
+/// The session a paste belongs to, captured while that session still owns the
+/// voice state: a paste runs on its own thread, and a remembered press can
+/// start the next session (overwriting the target app) before it gets there.
+pub(crate) struct PasteOwner {
+    session: u64,
+    target: Option<crate::focus_target::FrontApp>,
+}
+
+impl PasteOwner {
+    pub(crate) fn capture(app: &AppHandle) -> Self {
+        Self {
+            session: RECORDING_SESSION.load(Ordering::SeqCst),
+            target: app.state::<VoiceSessionState>().target_app(),
+        }
+    }
+}
 
 const CANCELLATION_POLL_INTERVAL: Duration = Duration::from_millis(25);
 
@@ -39,9 +62,12 @@ struct RecordingErrorEvent {
 
 /// Drop guard that notifies the [`TranscriptionCoordinator`] when the
 /// transcription pipeline finishes — whether it completes normally or panics.
-struct FinishGuard(AppHandle);
+struct FinishGuard(AppHandle, Arc<TranscriptionManager>);
 impl Drop for FinishGuard {
     fn drop(&mut self) {
+        // Early exits (no audio, cancelled) skip the unload `transcribe()`
+        // does, which left an "unload immediately" model resident.
+        self.1.maybe_unload_immediately("transcription session");
         if let Some(c) = self.0.try_state::<TranscriptionCoordinator>() {
             c.notify_processing_finished();
         }
@@ -83,8 +109,10 @@ fn strip_think_block(s: &str) -> &str {
 /// LLM call when nothing was actually transcribed, which would otherwise make
 /// the model reply with an error message such as "you need to provide the
 /// transcription".
-fn is_blank_transcription(transcription: &str) -> bool {
-    transcription.trim().is_empty()
+/// No letters or digits: empty, or what short wordless clips often come back
+/// as ("." / "?" / "。"). CJK characters count as letters.
+pub(crate) fn is_blank_transcription(transcription: &str) -> bool {
+    !transcription.chars().any(char::is_alphanumeric)
 }
 
 async fn complete_unless_cancelled<F, C>(operation: F, is_cancelled: C) -> Option<F::Output>
@@ -442,6 +470,30 @@ pub(crate) async fn process_transcription_output(
                 }
             }
         }
+        SessionMode::Scene => {
+            // Always uses the text model, whatever the everyday dictation
+            // mode is; without one it falls back to the transcript.
+            let kind = PromptKind::Scene(crate::voice::custom_scene_prompt(&settings));
+            let system_prompt =
+                crate::voice::build_system_prompt(&kind, &settings.dictionary, &text)
+                    .expect("scene dictation always has a prompt");
+            match run_text_model(&settings, &system_prompt, &text).await {
+                Ok(processed) => Ok(ProcessedTranscription {
+                    post_processed_text: Some(processed.text.clone()),
+                    final_text: processed.text,
+                    post_process_prompt: Some(system_prompt),
+                    llm: Some(processed.trace),
+                }),
+                Err(TextModelError::NotConfigured(why)) => {
+                    debug!("Scene post-processing skipped: {why}");
+                    Ok(unchanged(text))
+                }
+                Err(err) => {
+                    warn!("Scene post-processing failed ({err:?}); inserting the transcript");
+                    Ok(unchanged(text))
+                }
+            }
+        }
         SessionMode::Translate => {
             let target = crate::voice::find_translate_target(target_language)
                 .or_else(|| {
@@ -472,54 +524,71 @@ pub(crate) async fn process_transcription_output(
     }
 }
 
-/// Paste `text` into the focused app on the main thread, then hide the overlay.
+/// Paste `text` into the focused app, then hide the overlay. Runs on its own
+/// thread, not the main one: paste sleeps between steps, and only its input
+/// injection hops to the main thread (see `clipboard::with_enigo`).
 /// `cancel_generation` (when given) aborts the paste if the user cancelled.
-pub(crate) fn paste_and_finish(app: &AppHandle, text: String, cancel_generation: Option<u64>) {
+pub(crate) fn paste_and_finish(
+    app: &AppHandle,
+    text: String,
+    cancel_generation: Option<u64>,
+    owner: PasteOwner,
+) {
     let ah = app.clone();
     let paste_time = Instant::now();
     let rm = Arc::clone(&app.state::<Arc<AudioRecordingManager>>());
-    app.run_on_main_thread(move || {
-        if let Some(generation) = cancel_generation {
-            if rm.was_cancelled_since(generation) {
-                debug!("Transcription operation cancelled before paste");
-                utils::hide_recording_overlay(&ah);
-                set_tray_state(&ah, TrayIconState::Idle);
-                return;
-            }
+    let PasteOwner { session, target } = owner;
+    let is_current = move || RECORDING_SESSION.load(Ordering::SeqCst) == session;
+    // A new session may have started while this paste ran; the overlay and
+    // tray are then its, not ours to reset.
+    let finish = move |ah: &AppHandle| {
+        if RECORDING_SESSION.load(Ordering::SeqCst) == session {
+            utils::hide_recording_overlay(ah);
+            set_tray_state(ah, TrayIconState::Idle);
         }
-        let target = ah.state::<VoiceSessionState>().target_app();
-        let current = crate::focus_target::frontmost_app();
-        match crate::focus_target::decide_insert(target.as_ref(), current.as_ref(), &text) {
-            crate::focus_target::InsertDecision::CopyOnly(reason) => {
-                use tauri_plugin_clipboard_manager::ClipboardExt;
-                debug!("Not pasting ({reason:?}); leaving the text on the clipboard");
-                if let Err(e) = ah.clipboard().write_text(text) {
-                    error!("Failed to copy text to clipboard: {}", e);
-                    let _ = ah.emit("paste-error", ());
-                    utils::hide_recording_overlay(&ah);
-                } else {
-                    utils::show_copied_notice(&ah, reason);
+    };
+    std::thread::Builder::new()
+        .name("paste".into())
+        .spawn(move || {
+            if let Some(generation) = cancel_generation {
+                if rm.was_cancelled_since(generation) {
+                    debug!("Transcription operation cancelled before paste");
+                    finish(&ah);
+                    return;
                 }
-                set_tray_state(&ah, TrayIconState::Idle);
-                return;
             }
-            crate::focus_target::InsertDecision::Paste => {}
-        }
-        match utils::paste(text, ah.clone()) {
-            Ok(()) => debug!("Text pasted successfully in {:?}", paste_time.elapsed()),
-            Err(e) => {
-                error!("Failed to paste transcription: {}", e);
-                let _ = ah.emit("paste-error", ());
+            let current = crate::focus_target::frontmost_app();
+            match crate::focus_target::decide_insert(target.as_ref(), current.as_ref(), &text) {
+                crate::focus_target::InsertDecision::CopyOnly(reason) => {
+                    use tauri_plugin_clipboard_manager::ClipboardExt;
+                    debug!("Not pasting ({reason:?}); leaving the text on the clipboard");
+                    if let Err(e) = ah.clipboard().write_text(text) {
+                        error!("Failed to copy text to clipboard: {}", e);
+                        let _ = ah.emit("paste-error", ());
+                        finish(&ah);
+                    } else if is_current() {
+                        utils::show_copied_notice(&ah, reason);
+                        set_tray_state(&ah, TrayIconState::Idle);
+                    }
+                    return;
+                }
+                crate::focus_target::InsertDecision::Paste => {}
             }
-        }
-        utils::hide_recording_overlay(&ah);
-        set_tray_state(&ah, TrayIconState::Idle);
-    })
-    .unwrap_or_else(|e| {
-        error!("Failed to run paste on main thread: {:?}", e);
-        utils::hide_recording_overlay(app);
-        set_tray_state(app, TrayIconState::Idle);
-    });
+            match utils::paste(text, ah.clone()) {
+                Ok(()) => debug!("Text pasted successfully in {:?}", paste_time.elapsed()),
+                Err(e) => {
+                    error!("Failed to paste transcription: {}", e);
+                    let _ = ah.emit("paste-error", ());
+                }
+            }
+            finish(&ah);
+        })
+        .map(|_| ())
+        .unwrap_or_else(|e| {
+            error!("Failed to start the paste thread: {:?}", e);
+            utils::hide_recording_overlay(app);
+            set_tray_state(app, TrayIconState::Idle);
+        });
 }
 
 /// How long a translation failure stays on screen if the user ignores it.
@@ -578,6 +647,19 @@ impl ShortcutAction for TranscribeAction {
         });
         let kickoff_elapsed = kickoff_started.elapsed();
 
+        // Don't open the mic if nothing can transcribe the recording; the load
+        // kicked off above fails and reports why.
+        if !uses_cloud_asr && !tm.is_model_loaded() {
+            let selected_model = get_settings(app).selected_model;
+            if let Err(e) = app
+                .state::<Arc<ModelManager>>()
+                .get_model_path(&selected_model)
+            {
+                warn!("Not starting recording: no model can transcribe it ({e})");
+                return;
+            }
+        }
+
         let binding_id = binding_id.to_string();
 
         // Freeze this session's mode and target language before the overlay
@@ -594,6 +676,7 @@ impl ShortcutAction for TranscribeAction {
                 .set_target_app(crate::focus_target::frontmost_app());
         }
 
+        RECORDING_SESSION.fetch_add(1, Ordering::SeqCst);
         let tray_started = Instant::now();
         set_tray_state(app, TrayIconState::Recording);
         let tray_elapsed = tray_started.elapsed();
@@ -781,12 +864,13 @@ impl ShortcutAction for TranscribeAction {
                                                  // text is processed apply to the next session.
         let (session_mode, target_language) = app.state::<VoiceSessionState>().snapshot();
         let dictation_post_mode = get_settings(app).dictation_post_mode;
-        let uses_text_model = session_mode == SessionMode::Translate
+        let uses_text_model = matches!(session_mode, SessionMode::Translate | SessionMode::Scene)
             || dictation_post_mode != crate::settings::DictationPostMode::Off;
         let cancel_generation = rm.cancel_generation();
+        let owner = PasteOwner::capture(app);
 
         tauri::async_runtime::spawn(async move {
-            let _guard = FinishGuard(ah.clone());
+            let _guard = FinishGuard(ah.clone(), Arc::clone(&tm));
             debug!(
                 "Starting async transcription task for binding: {}",
                 binding_id
@@ -922,13 +1006,22 @@ impl ShortcutAction for TranscribeAction {
 
                     match transcription_result {
                         Ok(transcription) => {
+                            // Punctuation-only output is noise, not speech: treat
+                            // it like an empty result (no text model, no paste;
+                            // history records an empty entry as it does for
+                            // silence).
+                            let transcription = if is_blank_transcription(&transcription) {
+                                String::new()
+                            } else {
+                                transcription
+                            };
                             debug!(
                                 "Transcription completed in {:?}: '{}'",
                                 transcription_time.elapsed(),
                                 utils::redact_text(&transcription)
                             );
 
-                            if uses_text_model {
+                            if uses_text_model && !transcription.is_empty() {
                                 if use_streaming_overlay {
                                     tm.emit_stream_working(StreamWorkKind::Polishing);
                                 } else {
@@ -1007,6 +1100,7 @@ impl ShortcutAction for TranscribeAction {
                                     &ah,
                                     processed.final_text,
                                     Some(cancel_generation),
+                                    owner,
                                 );
                             }
                         }
@@ -1105,6 +1199,7 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
         crate::voice::BINDING_DICTATE_ALT,
         crate::voice::BINDING_TRANSLATE,
         crate::voice::BINDING_TRANSLATE_ALT,
+        crate::voice::BINDING_SCENE,
         crate::voice::BINDING_LEGACY_POST_PROCESS,
     ] {
         map.insert(
@@ -1141,10 +1236,14 @@ mod tests {
         assert!(is_blank_transcription(""));
         assert!(is_blank_transcription("   "));
         assert!(is_blank_transcription("\t\n  \r\n"));
+        assert!(is_blank_transcription("."));
+        assert!(is_blank_transcription(" 。？ "));
     }
 
     #[test]
     fn non_blank_transcription_is_kept() {
+        assert!(!is_blank_transcription("好"));
+        assert!(!is_blank_transcription("42"));
         assert!(!is_blank_transcription("hello"));
         assert!(!is_blank_transcription("  hello  "));
     }

@@ -32,6 +32,7 @@
     "processing": "整理中…",
     "translating": "翻译中…",
     "translateTo": "翻译为",
+    "scene": "场景口述",
     "cancel": "取消",
     "confirm": "完成",
     "translateFailed": "翻译失败",
@@ -99,6 +100,10 @@
         "title": "翻译",
         "description": "按下开始和停止翻译。"
       },
+      "scene": {
+        "title": "场景口述",
+        "description": "用你自己写的场景提示词整理口述，比如客服回复。提示词在「模型 → 文本模型」里编辑。"
+      },
       "pressKeys": "请按下快捷键…",
       "reset": "恢复默认",
       "activation": {
@@ -108,7 +113,7 @@
         "toggle": "仅短按切换",
         "push_to_talk": "仅按住说话"
       },
-      "tips": "录音时：按 Esc 或点 ✕ 取消，点 ✓ 结束。先按住 Fn 再按左 Shift，会把正在进行的口述切换为翻译。",
+      "tips": "录音时：按 Esc 或点 ✕ 取消，点 ✓ 结束。先按住 Fn 再按左 Shift，会把正在进行的口述切换为翻译；再按左 Option 则切换为场景口述。",
       "fnHardware": "Fn 键只在 Apple 键盘上有效。使用第三方键盘时，请改用其他快捷键。",
       "fnWarning": {
         "title": "Fn 键与系统设置冲突",
@@ -256,7 +261,9 @@
           "description": "告诉文本模型怎么处理口述文字。词典术语、数字/代码/URL 原样保留的规则和输出格式会自动附加在后面。清空即恢复默认。",
           "customized": "已自定义",
           "reset": "恢复默认",
-          "saveFailed": "提示词保存失败：{{error}}"
+          "saveFailed": "提示词保存失败：{{error}}",
+          "sceneTitle": "场景口述提示词",
+          "sceneDescription": "只用于「场景口述」快捷键，不受上面的口述整理档位影响，适合写某个场景的专门要求（比如客服回复的语气和措辞）。词典术语、数字/代码/URL 原样保留的规则和输出格式同样会自动附加。清空即恢复默认（与「整理」相同）。"
         }
       },
       "glm": {
